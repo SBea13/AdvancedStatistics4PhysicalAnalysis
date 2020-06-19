@@ -1,0 +1,469 @@
+# Exercise 1
+
+The time it takes a student to complete a TOLC-I University orientation and evaluation test follows a density function of the form:
+
+$$ f(t) = \begin{cases} c(t−1)(2−t) & 1< t <2 \\ 0 & \mbox{othervise} \end{cases} $$
+where $t$ is the time in hours.
+
+1. using the `integrate()` $R$ function, determine the constant $c$ (and verify it analytically)
+1. write the set of four $R$ functions and plot the pdf and cdf, respectively
+1. evaluate the probability that the student will finish the aptitude test in:
+    - more than $75$ minutes;
+    - between $90$ and $120$ minutes.
+
+
+## Solution
+
+**1.** The constant $c$ needs to be set as normalization constant: in fact, in order for $f$ to be a $pdf$, the area below the curve must be equal to $1$. Hence:
+
+$$ \frac{1}{c} = \int^2_1 (t-1)(2-t)dt = \int^2_1 (3t - t^2 -2) dt = \left[ \frac{3}{2}t^2 - \frac{t^3}{3} - 2t \right]^2_1 = 6 - \frac{8}{3} - 4 - \frac{3}{2} + \frac{1}{3} + 2 = \frac{1}{6} \implies c=6$$
+
+The result obtained above is derived again by integrating $f$ with the `integrate` $R$ function in the cell below. 
+
+```{r}
+f <- function(t){
+    y <- ifelse ( (t<2 & t>1),
+                  (t-1)*(2-t),
+                  0)    
+    return(y)
+}
+f<-Vectorize(f)
+
+area <- integrate(f, 1, 2)
+
+(c<-1/area$value)
+```
+**2.** The functions in the cell below are:
+ 
+- the probability distribution function $f$;
+- the cumulative distribution function $F$, defined as $F(x)=\int^x_{-\infty}f(t) dt$;
+- the quantile function $q(y) = F^{-1}(y)$;
+- a function to randomly extract $n$ samples with distribution $f$ named $rf$.
+
+Some of them are derived with different methods that yield the same results.
+
+```{r}
+#install.packages('GoFKernel')
+library('GoFKernel')
+
+#-------------PDF-------------
+
+#the value of c = 6 is derived above
+pdf <- function(t){
+    y <- ifelse ( (t<2 & t>1),
+                  c*(t-1)*(2-t),
+                  0   
+                )
+    return(y)
+}
+pdf <- Vectorize(pdf)
+
+#-------------CDF-------------
+
+# Derived by manually integrating, obtained analytically
+cdf <- function(t){
+    y <- ifelse ( (t<2 & t>1),
+                   9*t^2 - 2*t^3 - 12*t + 5,
+                 ifelse ( (t>=2),
+                           1,
+                           0)
+                 )
+    return(y)
+} 
+cdf <- Vectorize(cdf)
+
+#Derived via its definition and the integrate R function
+cdf_i <- function(t){
+    y <- ifelse ( (t<2 & t>1),
+                   integrate(pdf, 1, t)$value,
+                 ifelse ( (t>=2),
+                           1,
+                           0)
+                 )
+    return(y)
+} 
+cdf_i <- Vectorize(cdf_i)
+
+#-------------QUANTILE FUNCTION-------------
+
+#Derived by inverse function of GoFKernel package
+q <- Vectorize(inverse(cdf, 1, 2))       #upper and lower boundaries of cdf domain
+
+#Derived by "manual" method and root finding function uniroot
+inv <- function (f, lower, upper) {
+   function (y){
+     uniroot(function(x){f(x)-y}, lower = lower, upper = upper)$root 
+   } 
+}
+qf <- Vectorize(inv(cdf, 1, 2))          #upper and lower boundaries of cdf domain
+
+#-------------RANDOM EXTRACTION OF n SAMPLES-------------
+
+#Inverse trasform method
+rf <- function(n, cdf, lower, upper) {
+    us <- runif(n)
+    rnd <- Vectorize(inverse(cdf, lower = lower, upper = upper)) 
+    return (rnd(us))
+}
+
+```
+
+```{r}
+options(repr.plot.width=18, repr.plot.height=12)  #to set graph size
+par(mfrow=c(2,3),  mar=c(5, 5, 4, 2))             #graphs in the same row
+
+x <- seq(1, 2, 0.04)
+p <- seq(0, 1, 0.04)
+
+plot(x, pdf(x), lwd=2.5, pch=4, col="red",
+     main="Probability distribution function", cex.main=2,
+     xlab="x [hours]", ylab="f(x)", cex.lab=2, las=1)
+lines(x, pdf(x), lwd=2.5, lty="dashed", col="darkred")
+
+plot(x, cdf(x), lwd=2.5, pch=4, col="blue",
+     main="Cumulative distribution function, analytical method", cex.main=2,
+     xlab="x [hours]", ylab="F(x)", cex.lab=2, las=1)
+lines(x, cdf(x), lwd=2.5, lty="dashed", col="dodgerblue2")
+
+plot(x, cdf_i(x), lwd=2.5, pch=4, col="orange",
+     main="Cumulative distribution function, integrate method", cex.main=2,
+     xlab="x [hours]", ylab="F(x)", cex.lab=2, las=1)
+lines(x, cdf_i(x), lwd=2.5, lty="dashed", col="gold")
+
+plot(p, q(p), lwd=2.5, pch=4, col="forestgreen",
+     main="Quantile function", cex.main=2,
+     xlab="p", ylab="q(p)", cex.lab=2, las=1)
+lines(p, q(p), lwd=2.5, lty="dashed", col="darkolivegreen1")
+
+plot(p, qf(p), lwd=2.5, pch=4, col="darkorchid",
+     main="Quantile function, manual method", cex.main=2,
+     xlab="p", ylab="q(p)", cex.lab=2, las=1)
+lines(p, qf(p), lwd=2.5, lty="dashed", col="plum")
+
+h <- hist(rf(10000, cdf, 1, 2), breaks= 15, col= "aquamarine", 
+          main="10000 Random samples from pdf", cex.main=2,
+          xlab="x [hours]", ylab="Counts", cex.lab=2, las=1)
+lines(x, 10000*(h$breaks[2]-h$breaks[1])*pdf(x), lwd=2.5, lty="dashed", col="grey")
+
+```
+
+**3.** To evaluate the probability that the student will finish the aptitude test in a given time (more than $75$ minutes, between $90$ and $120$ minutes), there are two equivalent methods:
+
+- by integrating the pdf with the given boundaries;
+- by using the cdf.
+
+It can be seen that both methods leads to the same numerical results: more than $84\%$ of students take the test in more than $75$ minutes, while for half of them ($50\%$) it takes from $90$ minutes to $2$ hours.
+
+```{r}
+#simple function to convert from minutes to hours in order to fit the pdf x-domain
+mins_to_h <- function(min){
+    h <- min/60 
+    return(h)
+}
+
+p_75 <- integrate(pdf, mins_to_h(75), 2)
+p_90_120 <- integrate(pdf, mins_to_h(90), mins_to_h(120))
+
+p_75_c <- 1 - cdf(mins_to_h(75))
+p_90_120_c <- cdf(mins_to_h(120))- cdf(mins_to_h(90))
+
+print(paste("P(x>1.25)_integrate=",p_75$value))
+print(paste("P(x>1.25)_cdf=",p_75_c))
+print(paste("P(1.5<x<2)_integrate=",p_90_120$value))
+print(paste("P(1.5<x<2)_cdf=",p_90_120_c))
+```
+
+# Exercise 2
+
+The lifetime of tires sold by an used tires shop is $10^4·x$ km, where $x$ is a random variable following the distribution function:
+
+$$ f(x) = \begin{cases} \frac{2}{x^2} & 1< x <2 \\ 0 & \mbox{othervise} \end{cases} $$
+
+1. write the set of four $R$ functions and plot the pdf and cdf, respectively
+1. determine the probability that tires will last less than $15000$ km
+1. sample $3000$ random variables from the distribution and determine the mean value and the variance, using the expression $Var[x]=E[x^2]- E^2[x]$
+
+## Solution
+
+**1.** The functions are defined exactly as **Exercise 1**, but this time only one method to derive them is chosen. The plots are displayed below.
+
+```{r}
+#-------------PDF-------------
+
+pdf <- function(x){
+    y <- ifelse ( (x<=2 & x>=1),
+                   2/(x^2),
+                   0)
+    return(y)
+}
+pdf <- Vectorize(pdf)
+
+#-------------CDF-------------
+
+#Derived via its definition and the integrate R function
+cdf <- function(x){
+    y <- ifelse ( (x<=2 & x>=1),
+                   integrate(pdf, 1, x)$value,
+                 ifelse ( (x>2),
+                           1,
+                           0)
+                 )
+    return(y)
+} 
+cdf <- Vectorize(cdf_i)
+
+#-------------QUANTILE FUNCTION-------------
+
+#Derived by inverse function of GoFKernel package
+q <- Vectorize(inverse(cdf, 1, 2))       #upper and lower boundaries of cdf domain
+
+#-------------RANDOM EXTRACTION OF n SAMPLES-------------
+
+#Inverse trasform method
+rf <- function(n, cdf, lower, upper) {
+    us <- runif(n)
+    rnd <- Vectorize(inverse(cdf, lower = lower, upper = upper)) 
+    return (rnd(us))
+}
+```
+
+```{r}
+options(repr.plot.width=14, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,2))#,  mar=c(5, 5, 4, 2))           #graphs in the same row
+
+x <- seq(1, 2, 0.04)
+
+plot(x, pdf(x), lwd=2.5, pch=4, col="red",
+     main="Probability distribution function", cex.main=1.5,
+     xlab=expression(paste("x [", 10^4, " km]")), ylab="f(x)", cex.lab=1.5, las=1)
+lines(x, pdf(x), lwd=2.5, lty="dashed", col="darkred")
+
+plot(x, cdf(x), lwd=2.5, pch=4, col="blue",
+     main="Cumulative distribution function", cex.main=1.5,
+     xlab=expression(paste("x [", 10^4, " km]")), ylab="F(x)", cex.lab=1.5, las=1)
+lines(x, cdf(x), lwd=2.5, lty="dashed", col="dodgerblue2")
+
+```
+
+**2.** The probability that tires will last less than $15000$ km is given by the integral of the $pdf$ for $x<1.5$, or the $cdf$ with $x=1.5 \implies 66.67\%$.
+
+```{r}
+prob <- cdf(1.5)
+print(paste("Probability of tires lasting less than 15000 km (cdf): ", prob))
+
+p_pdf <- integrate(pdf, 1, 1.5)
+print(paste("Probability of tires lasting less than 15000 km (pdf): ", p_pdf$value))
+
+```
+
+**3.** By sampling $3000$ random variables from the distribution, it is possible to determine its mean value and variance, knowing that:
+
+$$E[x]= \int^2_1 x f(x) dx$$
+
+and $$Var[x]=E[x^2]- E^2[x].$$
+
+Two estimates of the average value are obtained:
+
+- from the simulated data, by averaging them with the `mean` function;
+- from the $pdf$, with the definition above.
+
+The cell below shows the "theoretical" value derived with the `integrate` function - with its associated error given by the function (which has not a statistical meaning), and the "experimental" value derived from the simulated data, whose error is the squared root of the variance $Var[x]$ of the distribution.
+
+```{r}
+sim_3000 <- rf(3000, cdf, 1, 2)
+
+x <- seq(1,2,1/3000)
+
+avg_exp <- mean(sim_3000)
+e_x <- integrate(function(x){x * pdf(x)}, 1, 2)
+e_x2 <- integrate(function(x){x^2 * pdf(x)}, 1, 2)
+
+var <-  e_x2$value - e_x$value^2
+var
+print(paste("Theoretical mean:", e_x$value, "+/-", e_x$abs.error))
+print(paste("Experimental mean:", avg_exp, "+/-", sqrt(var)))
+
+```
+
+<!-- #region -->
+# Exercise 3
+
+Markov’s inequality represents an upper boud to probability distributions:
+
+$$ P(X \geq k) \leq \frac{E[X]}{k} \mbox{ for } k >0 $$
+
+Having defined a function
+
+$$ G(k) = 1−F(k) \equiv P(X \geq k) $$
+
+plot $G(k)$ and the Markov’s upper bound for:
+
+1. the exponential distribution function $Exp(\lambda= 1)$;
+1. the uniform distribution function $U(3,5)$;
+1. the binomial distribution function $Bin(n= 1,p= 1/2)$;
+1. the Poisson distribution function $Pois(\lambda= 1/2)$.
+
+
+## Solution
+<!-- #endregion -->
+
+```{r}
+#-----Definition of the left-hand-side of Markov's inequality functions-----
+
+g_exp  <- function(k) {1- pexp(k, 1)}         #exponential distribution
+g_unif <- function(k) {1- punif(k, 3, 5)}     #uniform distribution
+g_bin  <- function(k) {1- pbinom(k, 1, 0.5)}  #binomial distribution
+g_pois <- function(k) {1- ppois(k, 0.5)}      #Poisson distribution 
+
+#-----Definition of the expected values for the given distributions-----
+
+E_exp  <- 1     #1/lambda
+E_unif <- 4     #(a+b)/2
+E_bin  <- 1/2   #n*p
+E_pois <- 1/2   #lambda
+
+#-----Definition of the right-hand-side of M's inequality-----
+
+markov  <- function(k, E) {E/k}
+```
+
+```{r}
+options(repr.plot.width=14, repr.plot.height=12)  #to set graph size
+par(mfrow= c(2,2), mar=c(5, 5, 4, 2))
+
+x <-seq(0, 10, 0.5)
+
+plot(x, g_exp(x), lwd=2.5, pch=4, col="red",
+     main=expression(paste("1. Exponential distribution, Exp(", lambda,"=1)")), cex.main=2,
+     xlab="k", ylab=expression("P[X">="k]"), cex.lab=1.5, las=1)
+lines(x, g_exp(x), lwd=2.5, lty="dashed", col="darkred")
+curve(markov(x, E_exp), from=0, to=10, lwd=2, lty="dotdash", col="black", add=TRUE)
+legend(5, 1.1, legend=c("Markov", expression("P[X">="k]")),
+       col=c("black", "darkred"), lty=c("dotdash", "dashed"), 
+       bty='n', cex = 1.4 )
+
+plot(x, g_unif(x), lwd=2.5, pch=4, col="blue",
+     main=expression(paste("2. Uniform distribution, U(3,5)")), cex.main=2,
+     xlab="k", ylab=expression("P[X">="k]"), cex.lab=1.5, las=1)
+lines(x, g_unif(x), lwd=2.5, lty="dashed", col="dodgerblue2")
+curve(markov(x, E_unif), from=0, to=10, lwd=2, lty="dotdash", col="black", add=TRUE)
+legend(5, 1.1, legend=c("Markov", expression("P[X">="k]")),
+       col=c("black", "dodgerblue2"), lty=c("dotdash", "dashed"), 
+       bty='n', cex = 1.4 )
+
+plot(x, g_bin(x), lwd=2.5, pch=4, col="forestgreen",
+     main=expression(paste("3. Binomial distribution, Bin(n=1, p=1/2)")), cex.main=2,
+     xlab="k", ylab=expression("P[X">="k]"), cex.lab=1.5, las=1)
+lines(x, g_bin(x), type='s', lwd=2.5, lty="dashed", col="darkolivegreen1")
+curve(markov(x, E_bin), from=0, to=10, lwd=2, lty="dotdash", col="black", add=TRUE)
+legend(5, 0.55, legend=c("Markov", expression("P[X">="k]")),
+       col=c("black", "forestgreen"), lty=c("dotdash", "dashed"), 
+       bty='n', cex = 1.4 )
+
+plot(x, g_pois(x), lwd=2.5, pch=4, col="darkorchid",
+     main=expression(paste("4. Poisson distribution, Pois(", lambda,"=1/2)")), cex.main=2,
+     xlab="k", ylab=expression("P[X">="k]"), cex.lab=1.5, las=1)
+lines(x, g_pois(x), type='s', lwd=2.5, lty="dashed", col="plum")
+curve(markov(x, E_pois), from=0, to=10, lwd=2, lty="dotdash", col="black", add=TRUE)
+legend(5, 0.43, legend=c("Markov", expression("P[X">="k]")),
+       col=c("black", "darkorchid"), lty=c("dotdash", "dashed"), 
+       bty='n', cex = 1.4 )
+
+```
+
+<!-- #region -->
+# Exercise 4
+
+Chebyshev’s inequality tell us that:
+
+$$P(|X−\mu|≥k\sigma)≤\frac{1}{k^2}$$
+
+which can also be written as:
+
+$$P(|X−\mu|< k\sigma)≥1−\frac{1}{k^2}$$
+
+Use  $R$  to  show,  with  a  plot,  that  Chebyshev’s  inequality  is  is  an  upper  bound  to  the  following distributions: 
+
+1. a normal distribution, $N(\mu= 3,\sigma= 5)$;
+1. an exponential distribution, $Exp(\lambda= 1)$;
+1. a uniform distribution, $U(1−\sqrt{2},1 +\sqrt{2})$;
+1. a Poisson distribution function, $Pois(\lambda= 1/3)$.
+
+
+## Solution
+
+
+<!-- #endregion -->
+
+```{r}
+mu_n      <- 3         #average of normal distribution
+sigma_n   <- 5         #sqrt(variance) of normal distribution
+mu_exp    <- 1         #average = 1/lambda
+sigma_exp <- 1         #sqrt(variance) =1/lambda
+mu_u      <- 1         #mean = (a+b)/2
+sigma_u   <- sqrt(2/3) #sqrt(variance) = (b-a)/sqrt(12) 
+lambda    <- 1/3       #mean Pois = var Pois = lambda 
+
+p_n  <- function(k, mu, sigma){
+            pnorm(mu_n+k*sigma_n, mu_n, sigma_n)-pnorm(mu_n-k*sigma_n, mu_n, sigma_n)
+        }
+p_e  <- function(k, mu, sigma){
+            pexp(mu_exp+k*sigma_exp, mu_exp)-pexp(mu_exp-k*sigma_exp, mu_exp)
+        }
+p_u  <- function(k, mu, sigma){
+            punif(mu_u+k*sigma_u, 1-sqrt(2), 1+sqrt(2))-punif(mu_u-k*sigma_u, 1-sqrt(2), 1+sqrt(2))
+        }
+p_p  <- function(k, mu, sigma){
+            ppois(lambda+k*sqrt(lambda), lambda)-ppois(lambda-k*sqrt(lambda), lambda)
+        }
+
+limit  <- function(k) {1- (1/k)^2}
+```
+
+```{r}
+options(repr.plot.width=14, repr.plot.height=12)  #to set graph size
+par(mfrow= c(2,2), mar=c(5, 5, 4, 2))
+
+k <- seq(0,4,0.1)
+
+plot(k, p_n(k), lwd=2.5, pch=4, col="red",
+     main=expression(paste("1. Normal distribution, N(",mu,"=3,",sigma,"=5)")), cex.main=2,
+     xlab="k", ylab=expression(paste("P[|X-",mu,"|<k",sigma,"]")), 
+     cex.lab=1.5, las=1)
+lines(k, p_n(k), lwd=2.5, lty="dashed", col="darkred")
+curve(limit(x), from=0, to=4, lwd=2, lty="dotdash", col="black", add=TRUE)
+legend(2, 0.3, legend=c("Chebyshev", expression(paste("P[|X-",mu,"|<k",sigma,"]"))),
+       col=c("black", "darkred"), lty=c("dotdash", "dashed"), 
+       bty='n', cex = 1.4 )
+
+plot(k, p_e(k), lwd=2.5, pch=4, col="blue",
+     main=expression(paste("2. Exponential distribution, Exp(", lambda,"=1)")), cex.main=2,
+     xlab="k", ylab=expression(paste("P[|X-",mu,"|<k",sigma,"]")), 
+     cex.lab=1.5, las=1)
+lines(k, p_e(k), lwd=2.5, lty="dashed", col="dodgerblue2")
+curve(limit(x), from=0, to=4, lwd=2, lty="dotdash", col="black", add=TRUE)
+legend(2, 0.3, legend=c("Chebyshev", expression(paste("P[|X-",mu,"|<k",sigma,"]"))),
+       col=c("black", "dodgerblue2"), lty=c("dotdash", "dashed"), 
+       bty='n', cex = 1.4 )
+
+plot(k, p_u(k), lwd=2.5, pch=4, col="forestgreen",
+     main=expression(paste("3. Uniform distribution, U(1-",sqrt(2),",1+",sqrt(2),")")), cex.main=2,
+     xlab="k", ylab=expression(paste("P[|X-",mu,"|<k",sigma,"]")), 
+     cex.lab=1.5, las=1)
+lines(k, p_u(k), lwd=2.5, lty="dashed", col="darkolivegreen1")
+curve(limit(x), from=0, to=4, lwd=2, lty="dotdash", col="black", add=TRUE)
+legend(2, 0.3, legend=c("Chebyshev", expression(paste("P[|X-",mu,"|<k",sigma,"]"))),
+       col=c("black", "darkolivegreen1"), lty=c("dotdash", "dashed"), 
+       bty='n', cex = 1.4 )
+
+plot(k, p_p(k), xlim=c(0,4), ylim=c(0,1), lwd=2.5, pch=4, col="darkorchid",
+     main=expression(paste("4. Poisson distribution, Pois(", lambda,"=1/3)")), cex.main=2,
+     xlab="k", ylab=expression(paste("P[|X-",mu,"|<k",sigma,"]")), 
+     cex.lab=1.5, las=1)
+lines(k, p_p(k), lwd=2.5,  type='s', lty="dashed", col="plum")
+curve(limit(x), from=0, to=4, lwd=2, lty="dotdash", col="black", add=TRUE)
+legend(2, 0.3, legend=c("Chebyshev", expression(paste("P[|X-",mu,"|<k",sigma,"]"))),
+       col=c("black", "plum"), lty=c("dotdash", "dashed"), 
+       bty='n', cex = 1.4 )
+
+```

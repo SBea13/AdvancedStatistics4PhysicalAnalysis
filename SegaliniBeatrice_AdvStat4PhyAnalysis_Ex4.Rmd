@@ -1,0 +1,413 @@
+# Exercise 1
+
+The triangular distribution, in the interval $(a,b)$, is given by the following:
+
+$$ f(x) = \begin{cases} \frac{2(x−a)}{(b−a)(c−a)} & a \leq x < c     \\ 
+                        \frac{2(b−x)}{(b−a)(b−c)} & c \leq x \leq b  \\
+                        0                & \mbox{othervise} \\    
+          \end{cases} $$
+where $c \in (a,b)$.
+
+1. plot the function, given the interval $(a,b)$...
+1. ... and write an algorithm to generate random numbers from the triangular distribution
+1. generate $10^4$ random number from the distribution, show them in an histogram and superimpose the analytical curve
+
+
+## Solution
+
+**1.**  The following function $f$ allow us to calculate the triangular distribution given the interval $(a,b)$ and the mode $c$. To properly works, $c$ must be inside the $(a,b)$ interval and $a$ must be strictly smaller than $b$.
+
+
+```{r}
+f <- function(x, a, b, c){
+    y <- ifelse ( (x<c & x>=a),
+                   2*(x−a)/((b−a)*(c−a)),
+                   ifelse ( (x<=b & x>=c),
+                             2*(b−x)/((b−a)*(b−c)),
+                             0)
+                )
+    return(y)
+}
+f <- Vectorize(f)
+```
+In the following plots, the triangular distribution is represented with three different $(a,b)$ intervals and $c$s.
+
+```{r}
+options(repr.plot.width=18, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,3),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+x <- seq(-6, 6, 0.05)
+
+plot(x, f(x, -4, 4, 1), xlim=c(-6,6),
+     lwd=2.5, pch=4, col="red",
+     main="(a, b) = (-4, 4); c = 1", cex.main=2,
+     xlab="x", ylab="f(x)", cex.lab=2, las=1)
+lines(x, f(x, -4, 4, 1), lwd=2.5, lty="dashed", col="darkred")
+
+plot(x, f(x, -1, 2.5, 1), xlim=c(-6,6),
+     lwd=2.5, pch=4, col="blue",
+     main="(a, b) = (-1, 2.5); c = 1", cex.main=2,
+     xlab="x", ylab="f(x)", cex.lab=2, las=1)
+lines(x, f(x, -1, 2.5, 1), lwd=2.5, lty="dashed", col="dodgerblue2")
+
+plot(x, f(x, 0, 5, 4), xlim=c(-6,6),
+     lwd=2.5, pch=4, col="orange",
+     main="(a, b) = (0, 5); c = 4", cex.main=2,
+     xlab="x", ylab="f(x)", cex.lab=2, las=1)
+lines(x, f(x, 0, 5, 4), lwd=2.5, lty="dashed", col="gold")
+
+
+```
+
+**2.** To generate random numbers from the triangular distribution, two methods are implemented.
+
+#### Acceptance/Rejection method 
+In the `gen_samples_f` function, the Acceptance/Rejection method is coded: two vectors of length $n$ are generated with uniform distribution, one by drawing samples $x$ in the $(a, b)$ interval (`xs`), the other one sampling probabilities $u$ between $0$ and $1$ (`us`). The samples $x$ are accepted if $f(x)>u\cdot c$. The algorithm stops when exactly `n` samples are accepted.
+
+#### Inverse trasform method
+The first step to implement the Inverse trasform method is to calculate the cumulative density function $F$ by integrating $f$:
+
+$$ F(x)= \int_{-\infty}^x f(t) dt = \left\{\begin{array}{ll}
+\frac{(x-a)^{2}}{(b-a)(c-a)} & a \leq x<c \\
+1-\frac{(x-b)^{2}}{(b-a)(b-c)} & c \leq x \leq b
+\end{array}\right. $$
+
+ Then, the quantile function $q$ is derived by inverting $F$:
+
+$$q(u) = F^{-1}(u)=\left\{\begin{array}{ll}
+a+\sqrt{(b-a)(c-a) u} & 0 \leq u<\frac{c-a}{b-a} \\
+b-\sqrt{(b-a)(b-c)(1-u)} & \frac{c-a}{b-a} \leq u \leq 1
+\end{array}\right.$$
+
+Finally, $n$ samples $p$ in $(0,1)$ are drawn uniformly, and applying to them $F^{-1}$, the results obtained are $n$ $f$-distributed samples.
+
+```{r}
+gen_samples_f <- Vectorize(function(n, a, b, c){
+                y <- NULL
+                while(length(y)<n){
+                    xs <- runif(n, a, b)
+                    us <- runif(n, 0, 1)
+
+                    ys <- ifelse(us * c < f(xs, a, b, c),
+                                xs,
+                                NA)
+
+                    ys <- na.omit(ys)
+                    y <- c(y, ys)
+                    }
+                return(y)
+                })
+
+```
+
+```{r}
+inv_transform <- Vectorize(function(n, a, b, c){
+                ps <- runif(n, 0, 1)
+                xs <- ifelse( (ps <(c−a)/(b−a)),
+                              a + sqrt((b-a)*(c-a)*ps),
+                              b - sqrt((b-a)*(b-c)*(1-ps))
+                            )
+                return(xs)
+                })
+
+```
+
+**3.** After generating $10^4$ random number from the distribution, two histograms are plotted, one for each method implemented. 
+One of them is a density histogram, normalized to the number of samples; the other one is a frequency histogram, hence $f$ in this case is multiplied by the actual area of the histogram ($w\cdot n$, with $w$ bin width and $n$ number of samples).
+
+$a$, $b$ and $c$ are arbitrarily fixed to $-4,4,1$.
+
+```{r}
+a <- -4 
+b <- 4
+c <- 1
+
+x <- seq(-6, 6, 0.5)
+n <- 10000
+
+options(repr.plot.width=16, repr.plot.height=8)  #to set graph size
+par(mfrow=c(1,2),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+hist(gen_samples_f(n, a, b, c), freq=FALSE,
+     col="lightskyblue", xlab="x", xlim=c(-6,6), ylim=c(0,0.3),
+     main="Acceptance/Rejection sampling, density histogram")
+curve(f(x, a, b, c), col="royalblue4", lt="dashed", lw=3, add=TRUE)
+
+h <- hist(inv_transform(n, a, b, c), freq=TRUE,
+     col="mistyrose", xlab="x", xlim=c(-6,6), 
+     main="Inverse trasform sampling, frequency histogram")
+lines(x, n*(h$breaks[2]-h$breaks[1])*f(x, -4, 4, 1), lwd=3, lty="dashed", col="mediumpurple")
+
+```
+
+# Exercise 2
+
+Given a discrete probability distribution, defined by the following probabilities:
+
+`0.05, 0.19, 0.14, 0.17, 0.02, 0.11, 0.06, 0.05, 0.04, 0.17`
+
+1. plot the probability density function and the cumulative density function
+1. write an algorithm to generate random numbers from the discrete probability distribution
+
+## Solution
+
+**1.** First of all, the sum of the given probabilities is computed to verify it is equal to $1$.
+
+```{r}
+p <- c(0.05, 0.19, 0.14, 0.17, 0.02, 0.11, 0.06, 0.05, 0.04, 0.17)
+sum(p)
+```
+
+Assuming that the discrete $pdf$ is defined in an interval $(1,10)$, the $pdf$ and $cdf$ are plotted by using steps and the `cumsum` function for the $cdf$.
+
+```{r}
+options(repr.plot.width=16, repr.plot.height=8)  #to set graph size
+par(mfrow=c(1,2),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+x <- 0:10
+
+plot(0, 0, type='n', xlim=c(0.5,11.5), ylim=c(0,0.2), 
+     main="Probability distribution function", cex.main=1.5,
+     xlab="x", ylab="f(x)", cex.lab=1.5, las=1)
+lines(c(x, 11, 12), c(0, p, 0, 0), type='s', lwd=2.5, col="darkred")
+
+plot(0, 0, type='n', xlim=c(0.5,10.5), ylim=c(0,1), 
+     main="Cumulative distribution function", cex.main=1.5,
+     xlab="x", ylab="F(x)", cex.lab=1.5, las=1)
+lines(c(x, 11), c(0, cumsum(p), 1), type='s', lwd=2.5, col="dodgerblue2")
+
+```
+
+**2.** write an algorithm to generate random numbers from the discrete probability distribution
+
+```{r}
+gen_discr <- function(n, x, p){ us <- runif(n, 0, 1)
+                                ps <- c(0,p)
+                                F <- cumsum(ps)
+                                samples <- NULL
+                                for (i in 2:length(F)){
+                                    s <- which( F[i-1] < us & us <= F[i])
+                                    xs <- x[i-1]+ (us[s]−F[i−1])/ps[i]
+                                    samples <- c(samples, xs)
+                                    }
+                                return(samples)
+                              }
+```
+
+```{r}
+x <- 0:10
+
+hist(gen_discr(10000, 0:10, p), freq=FALSE,
+     col="lightskyblue", xlab="x", #xlim=c(-6,6), ylim=c(0,0.3),
+     main="Sampling from discrete distribution, n=10000")
+lines(c(x, 11), c(p, 0, 0), type='s', lwd=3, col="navy")
+
+```
+
+# Exercise 3
+
+Generate random variables from the following distribution:
+
+$$f(x) = \frac{2}{\pi R^2} \sqrt{R^2−x^2}$$
+
+where $−R \leq x \leq R$.
+
+Using the acceptance-rejection algorithm, assume $M= 2/(\pi R)$ and generate $10^4$ random variables, plotting them in an histogram.
+
+## Solution
+
+```{r}
+f <- function(x, r){2*sqrt(r^2-x^2)/(pi*r^2)}
+
+acc_rej <- Vectorize(function(n, r){
+                y <- NULL
+                while(length(y)<n){
+                    xs <- runif(n, -r, r)
+                    us <- runif(n, 0, 1)
+                    M <- 2/(pi*r)
+                    ys <- ifelse(us * M < f(xs, r),
+                                xs,
+                                NA)
+
+                    ys <- na.omit(ys)
+                    y <- c(y, ys)
+                    }
+                return(y)
+                })
+
+```
+
+```{r}
+n <- 10000
+x <- seq(-2,2, 0.05)
+
+options(repr.plot.width=8, repr.plot.height=6)  #to set graph size
+par(mar=c(5, 5, 4, 2))                          #graphs in the same row
+
+hist(acc_rej(n, 2), freq=FALSE,
+     col="palegreen", xlab="x", cex.lab=1.5, las=1,
+     main="Acceptance/Rejection sampling, density histogram")
+curve(f(x, 2), col="seagreen4", lt="dotted", lw=3, add=TRUE)
+
+
+```
+
+<!-- #region -->
+# Exercise 4
+
+An important property of the gamma distribution is the so-called _reproductive property_.
+Given a sequence of independent random variables $X_j \sim Gamma(\alpha_j, \beta)$, it follows that:
+
+$$ Y =  \sum_{j=1}^n X_j \implies Y \sim Gamma(\alpha,\beta) \mbox{ where } \alpha= \sum_{j=1}^n \alpha_j$$
+
+If $α=m$ is an integer, a random variable from Gamma distribution $Gamma(m,\beta)$ (also known as Erlang distribution) can be obtained by summing $m$ independent exponential random variables $X_j \sim Exp(\beta)$:
+
+$$Y=\beta \sum_{j=1}^n(−ln U_j) =−\beta ln\prod_{j=1}^n U_j $$
+
+Write an algorithm to sample variables from an Erlang distribution $Gamma(m, \beta)$.
+
+
+## Solution
+
+The Erlang distribution is part of `stats` package in `R`, in particular random data generation is obtained via the `rgamma` function.
+
+This result can be compaired with the one obtained by exploiting the last equation in the text of the exercise, implemented in function `sample_earl`.
+
+<!-- #endregion -->
+
+```{r}
+m <- 10
+beta <- 0.5
+n <- 10000
+
+sample_earl <- function(n, m, beta){ replicate(n, (−1/beta)∗log(prod(runif(m, 0, 1)))) }
+
+options(repr.plot.width=18, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,2), mar=c(5, 5, 4, 2))             #graphs in the same row
+
+hist(sample_earl(n, m, beta), freq=FALSE,
+     col="tan1", xlab="x", cex.lab=1.5, las=1,
+     main="Sampling from Erlang distribution, manual method")
+curve(dgamma(x, m, beta), col="orangered", lt="dotted", lw=3, add=TRUE)
+
+hist(rgamma(n, m, beta), freq=FALSE,
+     col="lightpink", xlab="x", cex.lab=1.5, las=1,
+     main="Built in R-sampling")
+curve(dgamma(x, m, beta), col="hotpink4", lt="dotted", lw=3, add=TRUE)
+
+```
+
+# Exercise 5
+
+One  of  the  first  random  number  generator  was  proposed  by  von  Neumann,  the  so-called _middle square_ algorithm. 
+
+Write `R` code to implement this type of generator and, given a fixed digit number input, square it an remove the leading and trailing digits, in order to return a number with the same number of digits as the original number
+
+_Suggestion_ : after having squared the number, convert it to a list of characters
+
+`(number <- unlist(strsplit(as.character(x.squared),"")))`
+
+and, after having removed the head and tail of the list, convert it back to a number
+
+`(as.numeric(paste(number.after.trimming, collapse="")))`
+
+```{r}
+middle_square <- function(n, seed){ 
+    x <- NULL
+    for (i in 1:n){
+        #square the seed
+        x.squared <- format(seed^2, scientific=FALSE)
+        #convert seed to list of characters
+        number <- unlist(strsplit(as.character(x.squared),""))
+        #seed length 
+        len <- length(unlist(strsplit(as.character(seed),"")))
+        #add 0 at the begininning of the number if it does not have the proper number of digits (2*len)
+        ifelse( (length(number)<2*len),
+                num <- c(rep(0,2*len - length(number)), number),
+                num <-  number
+               )
+        #cut the number head and tail
+        trim <- number[(len/2+1):(3*len/2)]
+        #convert to number
+        gen <- as.numeric(paste(trim, collapse=""))
+        x <- c(x, gen)
+        seed <- gen
+        }
+        return(x)
+    }
+```
+
+```{r}
+middle_square(500, 1234430)
+```
+
+The algorithm does not work properly. In fact, depending on the seed, the chain of generated number stops.
+To try to improve it, a method to control the length of the squared number is implemented. The algorithm adds some $0$s at the beginning of `seed`$^2$ and then, when trimming, eventually shifts the beginning of the sequence in order not to pick a $0$ as beginning digit. 
+
+```{r}
+middle_square <- function(n, seed){ 
+    x <- NULL
+    for (i in 1:n){
+        #square the seed
+        x.squared <- format(seed^2, scientific=FALSE)
+        #convert seed to list of characters
+        number <- unlist(strsplit(as.character(x.squared),""))
+        #seed length 
+        len <- length(unlist(strsplit(as.character(seed),"")))
+        #add 0 at the begininning of the number if it does not have the proper number of digits (2*len)
+        ifelse( (length(number)<2*len),
+                num <- c(rep(0,2*len - length(number)), number),
+                num <-  number
+               )
+        #check if the new number starts with 0 and eventually shift the start of the trimming
+        ifelse( number[len/2] == 0,
+                trim <- number[(len/2+1):(3*len/2)],
+                trim <- number[(len/2):(3*len/2-1)]
+               )
+        #convert to number
+        gen <- as.numeric(paste(trim, collapse=""))
+        x <- c(x, gen)
+        seed <- gen
+        }
+        return(x)
+    }  
+```
+
+```{r}
+middle_square(500, 1234430)
+```
+
+Despite the applied improvements, the algorithm still does not work properly. In fact, it could happen that there are two zeros close to each other and so that the $0$-check implemented is not enough, hence the numbers generated have not the same number of digits.
+To try to avoid this problem, whenever a $0$ is detected as first digit of the trimmed sequence, it is substituted with an arbitrary digit (in this case, a $1$).
+
+```{r}
+middle_square <- function(n, seed){ 
+    x <- NULL
+    for (i in 1:n){
+        #square the seed
+        x.squared <- format(seed^2, scientific=FALSE)
+        #convert seed to list of characters
+        number <- unlist(strsplit(as.character(x.squared),""))
+        #seed length 
+        len <- length(unlist(strsplit(as.character(seed),"")))
+        #trimming
+        trim <- number[(len/2+1):(3*len/2)]
+        #check if the number starts with 0, eventually substitute it with a non-0 digit (randomly chosen)
+        ifelse( trim[1]==0,
+                trim[1] <- 1,
+                trim <- trim               
+               )
+        #convert to number
+        gen <- as.numeric(paste(trim, collapse=""))
+        x <- c(x, gen)
+        seed <- gen
+        }
+        return(x)
+    }
+```
+
+```{r}
+middle_square(1000, 1234430)
+```
+
+This final algorithm works significantly better that the previous two, but it still has problem with some "unfortunate" seeds, where the sequence is periodic and repeats itself (e.g. 120, 6000...)

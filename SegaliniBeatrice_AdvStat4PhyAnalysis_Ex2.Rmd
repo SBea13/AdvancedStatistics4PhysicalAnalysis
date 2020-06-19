@@ -1,0 +1,233 @@
+# Exercise 1
+A set of measurements have been performed on the concentration of a contaminantin tap water.  The given table reports a set of values ($x$), with the corresponding probabilities given by the two methods ($p_1$ and $p_2$).
+
+Evaluate the expected values, $E[x]$, and the variance, $Var(x)$, for both methods.
+
+## Solution
+
+As the table shows a discrete set of measurements with associated probabilities, the expected value and variance are calculated as follows:
+$$ E[x]_k = \sum_{i=1}^{N} x_i p_{i,k} $$
+$$ Var[x]_k = E[x-E[x]] = \sum_{i=1}^{N} (x_i-E[x_i]_k)^2 p_{i,k} $$
+
+where $k=1,2$ is the index for the two different methods, $i=1,\dots,N$ is the index of the sample considered.
+
+```{r}
+x <- c(15.58, 15.9, 16, 16.1, 16.2)
+p_1 <- c(0.15, 0.21, 0.35, 0.15, 0.14)
+p_2 <- c(0.14, 0.05, 0.64, 0.08, 0.09)
+
+Ex_1 <- sum(x * p_1)
+Varx_1 <- sum(((x - Ex_1) ^ 2) * p_1)
+
+Ex_2 <- sum(x * p_2)
+Varx_2 <- sum(((x - Ex_2) ^ 2) * p_2)
+
+print(paste("E[x]_1 = ", Ex_1))
+print(paste("Var[x]_1 = ", Varx_1))
+print(paste("E[x]_2 = ", Ex_2))
+print(paste("Var[x]_2 = ", Varx_2))
+```
+The two expectation values are exactly the same at the first significative digit: $\bar{x}_1 = 15.96 \pm 0.03$ and $\bar{x}_2 = 15.96 \pm 0.03$.
+
+
+# Exercise 2
+The waiting time, in minutes, at the doctor’s is about 30 minutes, and the distribution follows an exponential pdf with rate 1/30:
+
+1. simulate the waiting time for 50 people at the doctor’s office and plot the relative histogram
+1. what is the probability that a person will wait for less than 10 minutes ?
+1. evaluate  the  average  waiting  time  from  the  simulated  data  and  compare  it  with the  expected  value  (calculated  from  theory  and  by  manipulating  the  probability distributions using R)
+1. what is the probability for waiting more than one hour before being received ?
+
+## Solution
+
+```{r}
+options(repr.plot.width=7, repr.plot.height=6)  #to set graph size
+
+n <- 50                     #number of people waiting
+lambda <- 1/30              #exponential distribution rate
+x <- 0:150                  #abscissas
+sim_50 <- rexp(n, lambda)   #simulation 
+d_exp <- dexp(x, lambda)    #exponential distribution normalised
+
+h <- hist(sim_50, breaks=15,
+     main="Waiting time simulation, n=50", cex.main=1.5,
+     xlab="Time [min]", ylab="Counts", cex.lab=1.5,
+     col="coral")           #histogram containing the simulated data
+
+area <- n*h$breaks[2]       #area of the histogram = total number of counts n * binwitdh (h$breaks[2])
+
+lines(area*d_exp, lwd=2.5, lty="dashed", col="red")
+```
+
+**2.** The probability that a person will wait for less than 10 minutes is given by the integral of the $pdf$ for $x<10$, or the $cdf$ with $x=10 \implies 28.35\%$.
+
+```{r}
+theo_prob_10 <- pexp(10, rate=lambda)
+print(paste("Probability of waiting more than 10 minutes: ", theo_prob_10))
+```
+
+**3.** The "true" average value is $1/\lambda=30$ and it is given by the text of the exercise. The estimation of the average waiting time can be done in two different ways:
+
+- from the data, by averaging them with the `mean` function;
+- from the $pdf$, by using the definition of expectation value: $ E[x] = \sum_{x=1}^{N} x\cdot p(x) $, with $p(x)$ given by the exponential distribution.
+
+The three values will be slightly different but close to the real value $30$. By increasing the number of samples/the number of points in the `x` vector, the two values will converge to the "true" one.
+
+```{r}
+avg_exp <- mean(sim_50)
+avg_theory <- sum(x * d_exp)
+avg_true <- 1/lambda
+print(paste("Theoretical mean:", avg_theory))
+print(paste("Experimental mean:", avg_exp))
+print(paste("True mean:", avg_true))
+```
+
+**4.** Similarly to point **1.**, the probability of waiting more than one hour before being received can be estimated by subtracting from 1 the cumulative probability with $X=60 \implies 13.53\%$.
+
+```{r}
+prob_60 <- 1- pexp(60, rate=lambda)
+print(paste("Probability of waiting more than 1 hour: ", prob_60))
+```
+
+# Exercise 3
+
+Let’s suppose that on a book, on average, there is one typo error every three pages. If the number of errors follows a Poisson distribution, plot the pdf and cdf, and calculate the probability that there is at least one error on a specific page of the book.
+
+## Solution
+
+Given our hypothesis, the number of errors follows a Poisson distribution with $\lambda=1/3$. Hence, the probability of finding at least one error on a specific page of the book will be equal to $1$ minus the probability of not finding any error, given by the cumulative $pdf$ calculated with $x=0$: this implies $P=28.35\%$.
+
+```{r}
+lambda <- 1/3
+pdf <- dpois(1:10, lambda)
+cdf <- ppois(1:10, lambda)
+
+prob <- 1 - dpois(0, lambda) 
+print(paste("Probability of finding at least one error:", prob))
+
+options(repr.plot.width=14, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,2))                                #graphs in the same row
+
+plot(pdf, lwd=2.5, pch=4, col="red",
+     main="Poisson probability distribution function", cex.main=1.5,
+     xlab="x", ylab="pdf(x)", cex.lab=1.5)
+lines(pdf, lwd=2.5, type="s", lty="dashed", col="darkred")
+
+plot(cdf, lwd=2.5, pch=4, col="blue",
+     main="Poisson cumulative distribution function", cex.main=1.5,
+     xlab="X", ylab="cdf(X)", cex.lab=1.5)
+lines(cdf, lwd=2.5, type="s", lty="dashed", col="dodgerblue2")
+
+```
+
+# Exercise 4
+
+We randomly draw cards from a deck of 52 cards, with replacement, until one ace is drawn. Calculate the probability that at least 10 draws are needed.
+
+## Solution
+
+This problem is well described by a geometric distribution, with $p=4/52$ probability of success. In particular, one would observe that the probability of not picking an ace until the $10$-th trial is equal to $1$ minus the probability of picking one in the first $9$, obtaining:
+$$ P(x\geq10) = 1- P(x<9)= 1- \sum^9_{i=1} p(1-p)^{i-1} = 1-CDF(X=8) = 48.66\%$$
+
+```{r}
+1-pgeom(8, 4/52)
+```
+# Exercise 5
+
+The file available at the URL [https://userswww.pd.infn.it/~agarfa/didattica/sindaciincarica.csv)] contains  the  list  of  all  mayors  currently  in  charge  in  the Italian mayors working in local towns in Italy.  (Updated to April 6, 2020).
+
+1. plot the gender distribution among the mayors (column name `sesso`)
+1. plot the number of towns grouped per province (`codice_provincia`) and per region (`codice_regione`)
+1. plot  a  distributions  of  the  age  (years  only)  of  the  mayors.   In  the `data_nascita` column the birthday is available.
+1. plot a distribution of the time the mayor is in charge.  The starting date is in column `data_elezione`.  Since elections happen every 5 years, how many of them are going to complete their mandate this year?  And how many in 2021?
+
+## Solution
+
+```{r}
+library("lubridate")      #load the libraries
+library("tidyverse")      
+library("RColorBrewer")   #this is for fancy colouring
+
+url <- "https://userswww.pd.infn.it/~agarfa/didattica/sindaciincarica.csv"
+data <- tibble(read_csv2(url, skip=2))
+```
+
+**1.** First of all, a quick check on the missing values of the tibble is performed, in order to see if the gender data is present for each mayor. After having checked that, data is regrouped with a table and plotted with a barplot to see the gender distribution.
+
+```{r}
+apply ( apply (data, 2, is.na), 2, sum)
+unique(length(data$codice_comune))
+table(data$sesso)
+```
+
+```{r}
+options(repr.plot.width=7, repr.plot.height=6)  #to set graph size
+
+barplot(table(data$sesso), col=c("hotpink1", "cadetblue3"),  
+        main="Gender distribution", ylab="Counts", xlab="Gender", 
+        cex.main=2, cex.lab=1.5, las=1)
+```
+
+**2.** To regroup the data by province and region code, the function `table` is again used, then two barplots are plotted to graphically show it.
+
+```{r}
+options(repr.plot.width=14, repr.plot.height=6)  #to set graph size
+colors <- brewer.pal(n=12, name = "Set3")
+
+barplot(table(data$codice_provincia), col=colors,  
+        main="Province distribution", ylab="Counts", xlab="Province code", 
+        cex.main=2, cex.lab=1.5, las=1)
+```
+
+```{r}
+options(repr.plot.width=12, repr.plot.height=6)  #to set graph size
+
+barplot(table(data$codice_regione), col=colors,  
+        main="Region distribution", ylab="Counts", xlab="Province code", 
+        cex.main=2, cex.lab=1.5, las=1)
+```
+
+**3.** The age  of  the  mayors is calculated by converting the data in a proper format and applying the `interval` function. Using the `years` function of `lubridate`, the time difference in days is converted in years and put in the vector `ages`, which is then reported in a histogram for plotting the distribution.
+
+```{r}
+today <- as.POSIXlt(lubridate::today(), format = "%d/%m/%Y")        #today date
+dob <- as.POSIXlt(na.omit(data$data_nascita), format = "%d/%m/%Y")  #vector containing the date of births
+
+interval_age <- interval(dob, today)                                #ages in days
+
+ages <- interval_age %/% years(1)                                   #ages in years
+
+options(repr.plot.width=10, repr.plot.height=6)  #to set graph size
+
+hist(ages, 25, col=colors,
+     main="Age distribution", xlab="Ages", ylab="Counts",
+     cex.main=2, cex.lab=1.5, las=1)
+```
+
+**4.** The distribution of the time a mayor is in charge is derived following steps similar to point **3.**, making a time difference between today's date and the election one, and then plotting in a barplot.
+
+```{r}
+election_date <- as.POSIXlt(na.omit(data$data_elezione), format = "%d/%m/%Y")
+
+interval_charge <- interval(election_date, today)
+
+in_charge <- interval_charge %/% years(1)
+
+barplot(table(in_charge), col=colors,  
+        main="Length of mandate distribution", ylab="Counts", xlab="Years of mandate", 
+        cex.main=2, cex.lab=1.5, las=1)
+```
+
+To evaluate the number of mayors who will end their mandate this year (or the next one), the previously exploited procedure is again applied. A vector containing the time difference in days between the last day of $2020$ and the election date is created, then the intervals are converted from days to years and put in the vector `in_charge_20`. To select only the mayors whose mandate will end in $2020$, a selection in the aforementioned vector is performed to choose only the ones with more than $4$ years of mandate. For $2021$, instead, the mayors with exactly $4$ years of mandate are picked (in fact, next year they will have $5$ years of mandate, hence they will end it).
+
+```{r}
+interval_charge_20 <- interval(election_date, as.Date("2020-12-31"))
+
+in_charge_20 <- interval_charge_20 %/% years(1)
+
+length(in_charge_20[in_charge_20>4])     #finish mandate this year
+length(in_charge_20[in_charge_20==4])    #finish mandate next year
+```
+
+As it can be seen, there are $991$ mayors who will end their mandate in $2020$ and $1245$ in $2021$.
+One could observe that there are some mayors whose mandate is longer than 5 years. This might be due to the current circumstances of emergency, which could have postponed the election of new mayors.

@@ -1,0 +1,325 @@
+# Exercise 1
+
+The given table gives the volume, area, length and maximum and mean depths of some Scottish lakes. Create vectors, holding the lake's name and all the parameters and build a dataframe called `scottish.lakes` from the vectors:
+1. evaluate the highest and lowest volume and area lake;
+2. order the frame with respect to the area and determine the two largest area lakes;
+3. by summing up the areas occupied by the lakes, determine the area of Scotland covered by water.
+
+
+## Solution
+
+The first step is to create the dataframe `scottish.lakes` which contains all the information of the table. There are two ways to do so: by rows or by columns. The columnwise method is indeed more practical in this case, so it was chosen.
+
+```{r cars}
+Loch <- c( 'Loch Ness', 'Loch Lomond', 'Loch Morar', 'Loch Tay', 'Loch Awe', 
+           'Loch Maree', 'Loch Ericht', 'Loch Lochy', 'Loch Rannoch', 
+           'Loch Shiel', 'Loch Katrine', 'Loch Arkaig', 'Loch Shin')
+Volume <-c(7.45, 2.6, 2.3, 1.6, 1.2, 1.09, 1.08, 1.07, 0.97, 0.79, 0.77, 0.75, 0.35)
+Area <- c(56, 71, 27, 26.4, 39, 28.6, 18.6, 16, 19, 19.5, 12.4, 16, 22.5)
+Length <- c(39, 36, 18.8, 23, 41, 20, 23, 16, 15.7, 28, 12.9, 19.3, 27.8)
+Max_depth <-c(230, 190, 310, 150, 94, 114, 156, 162, 134, 128, 151, 109, 49)
+Mean_depth <-c(132, 37, 87, 60.6, 32, 38, 57.6, 70, 51, 40, 43.4, 46.5, 15.5)
+
+scottish.lakes <- data.frame(Loch, Volume, Area, Length,Max_depth,Mean_depth)
+scottish.lakes
+```
+
+**1.** To evaluate the highest and lowest volume and area lake, the function `order` is applied to the columns `Volume` and `Area`: the first and last elements are selected, with the following code.
+
+```{r}
+scottish.lakes[order(Volume, decreasing=TRUE),][1,]      #biggest volume
+scottish.lakes[order(Volume),][1,]                       #smallest volume
+scottish.lakes[order(Area, decreasing=TRUE),][1,]        #biggest area
+scottish.lakes[order(Area),][1,]                         #smallest area
+```
+
+Hence, it can be stated that the biggest lake of Scotland is **Loch Ness**, the smallest is **Loch Shin**; the one with the largest area is **Loch Lomond** and the smallest one is **Loch Katrine**.
+
+
+**2.** Similarly, the two largest area lakes are found, which are proven to be **Loch Lomond** and **Loch Ness**. Here the first two rows of the sorted dataframe are selected and not only the first one.
+
+```{r}
+scottish.lakes[order(Area, decreasing=TRUE),][1:2,]       
+```
+
+**3.** Finally, to determine the area of Scotland covered by water, we apply the function `sum` to the column `Area`, obtaining **$372$ $m^2$** of surface.
+
+
+```{r}
+sum(scottish.lakes$Area)
+```
+
+# Exercise 2
+
+Install the DAAG and the tibble packages: `install.packages(c('DAAG','tibble'), type='source')`; after having loaded the library, get information on the package content and on the `ais` data frame and create a tibble from the `ais` dataframe. Perform the following analysies:
+
+1. create a table grouping the data by gender and by sport; produce a barplot with the table adding a legend;
+2. determine if any of the columns holds missing values;
+3. produce boxplots of the main blood variables ('red blood cell counts', 'white blood cell counts', 'hematocrit' and 'hemaglobin concentration'), for different kind of sports;
+4. make some scatter plot correlations of the same blood variables using different colors and symbols for the two genders in the sample
+
+
+```{r}
+#install.packages(c("DAAG","tibble"), type="source") #install the required packages
+#install.packages("RColorBrewer") #this is for fancy colouring
+library("lattice")        #this is for plotting the correlation matrix
+library("tidyverse")      #load the libraries
+library("DAAG")
+library("RColorBrewer")   #this is for fancy colouring
+```
+
+```{r}
+data <- tibble(ais) #create a tibble containing the data of the dataset DAAG::ais
+head(data)
+```
+
+## Solution
+
+**1.** `t_ais` is a table that groups the data by gender and by sport. It is used as a base for producing the barplot below.
+
+```{r}
+t_ais <- table(data$sex, data$sport)
+t_ais
+```
+
+```{r}
+# create extra margin room on the right for an axis
+par(mar=c(6,6,5,0), mgp=c(3.5, 0.5, 0))
+
+barplot(t_ais, names.arg=colnames(t_ais), beside = TRUE, space=c(0,2), 
+        col = c("hotpink1", "cadetblue3"), legend = c("Women","Men"),#rownames (t_ais), 
+        main="How many men/women play a sport?", ylab="Counts", xlab="Sports", 
+        cex.main=2, cex.lab=2, las=2)
+```
+
+**2.** to determine if any of the columns holds missing values, the function`na.omit` is applied to the whole dataset: is can be observed that its size is not changed, hence there are not missing values in any columns. As a further proof, all the missing values in the tibble are summed, obtaining $0$ for each column.
+
+
+```{r}
+head(na.omit(data)) 
+apply ( apply (data, 2, is.na), 2, sum)
+```
+
+Another method to obtain the same result is to use the `any` function to the dataframe. If there are any missing values, it will return`<NA>`, otherwise `FALSE`, just like in this case.
+
+```{r}
+any(is.na(data))
+```
+
+**3.** the following boxplots represent the main blood variables ('red blood cell counts' **rcc**, 'white blood cell counts' **wcc**, 'hematocrit' **hc**, and 'hemaglobin concentration' **hg**), for all the 10 kind of sports reported in the `ais` dataframe. Each boxplot is related to a single blood variable and compares all the sports.
+
+```{r}
+par( mfrow=c(2,2), mar=c(6,6,4,0), mgp=c(4, 0.5, 0) )
+
+colors <- brewer.pal(n = length(unique(data$sport)), name = "Paired")
+
+boxplot(rcc~sport, data=data, col=colors, border="black", 
+        horizontal = TRUE, las=2, cex.main=1.5, cex.lab=1.5,
+        main="Red Blood Cells", xlab="Counts [10^12/l]", ylab="Sport")
+
+boxplot(wcc~sport, data=data, col=colors, border="black", 
+        horizontal = TRUE, las=2, cex.main=1.5, cex.lab=1.5,
+        main="White Blood Cells", xlab="Counts [10^12/l]", ylab="Sport")
+
+boxplot(hc~sport, data=data, col=colors, border="black", 
+        horizontal = TRUE, las=2, cex.main=1.5, cex.lab=1.5,
+        main="Hematocrit", xlab="Hc [%]", ylab="Sport")
+
+boxplot(hg~sport, data=data, col=colors, border="black", 
+        horizontal = TRUE, las=2, cex.main=1.5, cex.lab=1.5,
+        main="Hemoglobin", xlab="Concentration [g/daL]", ylab="Sport")
+
+```
+
+**4.** The ScatterPLOt Matrix (SPLOM) is generated with the `splom` function of the `lattice` package. In this way, it is possible to compare the $4$ main blood variables with each other, and also see in the same graphs the similaritties/differencees between the two genders.
+
+```{r}
+splom(data[c(1,2,3,4)], groups=data$sex, data=data, 
+      cex.lab=5, pch=c(1,4), col=c("hotpink1", "cadetblue3"),
+      panel=panel.superpose, 
+      key = list( title="M/F Blood Variables", cex=1.5,
+      points=list(pch=c(1,4), col=c("hotpink1", "cadetblue3")),
+      columns=2, text=list(c("Females","Males") ) ) 
+      ) 
+```
+
+It can be seen that:
+- **rcc** is correlated with both **hc** and **hg**, from the "linear" shape of their  graphs;
+- on the other hand, **wcc** is not related to any of the other variables;
+- men in general has higher values for the variables **rcc**, **hc** and **hg** with respect to women, while **wcc** is equally distributed for both men and women.
+
+
+# Exercise 3
+After having loaded the required data:
+
+1. examine the loaded tibble structure `covid`;
+1. create a sub-tibble containing only the last day and produce a table with all the countries with number of deaths or number of new cases greater than 200;
+1. select the top 10 countries, in terms of cases, and plot the total number of cases as a function of time. Plot the total number of deaths as a function of time. In order to compare the different curves, normalize the first date-time plot to the same $t_0$ value.
+
+```{r}
+# needed_packages <- c('lubridate', 'readxl', 'curl')
+# already_installed <- needed_packages %in% installed.packages()
+# for ( pack in needed_packages [! already_installed ]) {
+# message( paste("To be installed :", pack, sep =" "))
+# install.packages( pack )
+# }
+
+library ('lubridate')
+library ('readxl')
+library ('curl')
+
+url <- "https://www.ecdc.europa.eu/sites/default/files/documents/"
+fname <- "COVID-19-geographic-disbtribution-worldwide-"
+date <- lubridate::today() - 1
+ext = ".xlsx"
+target <- paste(url, fname, date, ext, sep="")
+message("target: ", target )
+tmp_file <- tempfile("data", "\\tmp", fileext =ext )
+tmp <- curl::curl_download( target, destfile=tmp_file )
+covid <- readxl::read_xlsx(tmp_file)
+covid
+```
+
+## Solution
+
+**1.** The loaded tibble `covid` has $10$ columns: data is classified by time (**dateRep**, **day**, **month**, **year** columns) and geographic area (**countriesAndTerritories**, **geoId**, **countryterritoryCode** columns). For each country, also the total population of 2018 (**popData2018**) is reported. Cases and deaths are reported daily in the columns **cases** and **deaths**. Data is sorted by geographic area in alphabetic order.
+
+```{r}
+head(covid)
+```
+
+```{r}
+apply ( apply (covid ,2,is.na), 2, sum)
+print("Missing countryterritoryCode")
+unique(covid[is.na(covid$countryterritoryCode)==TRUE,'countriesAndTerritories'])
+print("Missing popData2018")
+unique(covid[is.na(covid$popData2018)==TRUE,'countriesAndTerritories'])
+```
+
+There is some missing data: in particular, *Anguilla*, *Bonaire, Saint Eustatius and Saba*, *Czechia* and *Falkland_Islands_(Malvinas)* are missing the three letters geografic code and population number of 2018, and *Eritrea* only the latter. This information has been evaluated by using the function `is.na` and `unique` and by showing the two tibbles above.
+
+
+**2.** `tb_covid` is a sub-tibble of `covid` that contains data only of the last day, which is then ordered by number of cases and deaths in decreasing order. A further selection is applied to obtain a table with all the countries with number of deaths or number of new cases greater than 200.
+
+```{r}
+tb_covid <- covid[covid$dateRep==date,] #tibble with only yesterday's data
+tb_covid <- tb_covid[order(tb_covid$cases, tb_covid$deaths, decreasing=TRUE),] 
+tb_cov_200 <- tb_covid[(tb_covid$deaths >=200 | tb_covid$cases >=200), ]
+tb_cov_200[,c('countriesAndTerritories','geoId', 'deaths', 'cases')] 
+```
+
+**3.** The two-letters Id `geoId` is selected for the top 10 countries for number of cases in the last day and is put in the `states` vector. It will be used as a legend in the final plots.
+
+```{r}
+top10 <- tb_cov_200[1:10,]
+states <- top10$geoId
+states
+```
+
+To represent the number of deaths/cases as a function of time, the `cumsum` function is used. `na.omit` function is applied in order to avoid errors due to missing values, while `rev` is for putting the vectors in the correct order. 
+
+```{r}
+#total deaths
+colors <- brewer.pal(n = length(states), name = "Paired") #colors
+par(mgp=c(3, 0.5, 0))
+y_max <- 0
+
+for (i in 1:10){
+    ys <- cumsum(na.omit(rev(covid$deaths[covid$geoId==states[i]])))
+    xs <- as.Date(na.omit(rev(covid$dateRep[covid$geoId==states[i]])))
+    y_max <- max(ys, y_max)
+    plot(xs, ys, col=colors[i], pch=i, las=2,
+           xlim=c(as.Date("2020-02-28"),date), ylim=c(0,y_max+100),
+           xlab="", ylab="")
+    par(new=TRUE, xaxt='n', yaxt='n')
+}
+
+legend('topleft', legend=states, col=colors, pch=c(1:10))
+        
+title(main="Number of deaths vs. time", cex.main=1.5,
+      xlab="Time [date]", ylab="Total number of deaths", cex.lab=1.5)
+```
+
+```{r}
+#total deaths
+colors <- brewer.pal(n = length(states), name = "Paired") #colors
+par(mgp=c(3, 0.5, 0))
+y_max <- 0
+
+for (i in 1:10){
+    ys <- cumsum(na.omit(rev(covid$cases[covid$geoId==states[i]])))
+    xs <- as.Date(na.omit(rev(covid$dateRep[covid$geoId==states[i]])))
+    y_max <- max(ys, y_max)
+    plot(xs, ys, col=colors[i], pch=i, las=2,
+         xlim=c(as.Date("2020-02-28"),date), ylim=c(0,y_max+100),
+         xlab="", ylab="")
+    par(new=TRUE, xaxt='n', yaxt='n')
+}
+
+legend('topleft', legend=states, col=colors, pch=c(1:10))
+        
+title(main="Number of cases vs. time", cex.main=1.5,
+      xlab="Time [date]", ylab="Total number of cases", cex.lab=1.5)
+```
+
+In order to compare the different curves, a normalization is performed by translating curves of a time offset $t_0$, such that they have the same origin, obtaining the result below. A threshold of 10 cases/deaths is set to establish the starting of the epidemy and to choose the aforementioned offset $t_0$.
+
+```{r}
+#total cases
+colors <- brewer.pal(n = length(states), name = "Paired") #colors
+par(mgp=c(3, 0.5, 0))
+y_max <- 0
+x_max <- 0
+threshold <- 10 #set threshold for chosing t0
+
+for (i in 1:10){
+    y <- c()
+    x <- c()
+    y <- cumsum(na.omit(rev(covid$cases[covid$geoId==states[i]])))
+    x <- as.POSIXlt(na.omit(rev(covid$dateRep[covid$geoId==states[i]])))
+    t0 <- x[y>threshold][1]
+    xs <- difftime(x, t0, units="days")
+    x_max <- max(length(xs[y>threshold]), x_max)
+    y_max <- max(y, y_max)
+    plot(xs, log(y), col=colors[i], pch=i, las=2,
+         xlim= c(0, x_max), ylim=c(0,log(y_max+100)),
+         xlab="", ylab="")
+    par(new=TRUE, xaxt='n', yaxt='n')
+}
+
+legend('topleft', legend=states, col=colors, pch=c(1:10))
+title(main="Number of cases vs. normalized time", cex.main=1.5,
+      xlab="Time [days]", ylab="Total number of cases [logscale]", cex.lab=1.5)
+
+```
+
+```{r}
+#total cases
+colors <- brewer.pal(n = length(states), name = "Paired") #colors
+par(mgp=c(3, 0.5, 0))
+y_max <- 0
+x_max <- 0
+threshold <- 10 #set threshold for chosing t0
+
+for (i in 1:10){
+    y <- c()
+    x <- c()
+    y <- cumsum(na.omit(rev(covid$deaths[covid$geoId==states[i]])))
+    x <- as.POSIXlt(na.omit(rev(covid$dateRep[covid$geoId==states[i]])))
+    t0 <- x[y>threshold][1]
+    xs <- difftime(x, t0, units="days")
+    x_max <- max(length(xs[y>threshold]), x_max)
+    y_max <- max(y, y_max)
+    plot(xs, log(y), col=colors[i], pch=i, las=2,
+         xlim= c(0, x_max), ylim=c(0,log(y_max+100)),
+         xlab="", ylab="")
+    par(new=TRUE, xaxt='n', yaxt='n')
+}
+
+legend('topleft', legend=states, col=colors, pch=c(1:10))
+title(main="Number of deaths vs. normalized time", cex.main=1.5,
+      xlab="Time [days]", ylab="Total number of deaths [logscale]", cex.lab=1.5)
+
+```
+
+For these last graphs, a logaritmic scale is chosen for the y-axis to improve the readability: in fact, shifting the curves such that they have the same origin causes an inevitable overlapping. Hence, the logscale could help in seeing which curves grow faster with respect to the others.

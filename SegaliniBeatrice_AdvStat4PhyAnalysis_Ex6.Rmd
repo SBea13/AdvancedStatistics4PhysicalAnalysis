@@ -1,0 +1,562 @@
+<!-- #region -->
+# Exercise 1
+
+The  number  of  particles  emitted  by  a  radioactive  source  during  a  fixed  interval  of  time  ($\Delta t=10$ s) follows a Poisson distribution on the parameter $\mu$.  The number of particles observed during consecutive time intervals is:  4, 1, 3, 1 and 3.
+
+1. Suppose a uniform prior distribution for the parameter $\mu$
+    -  determine and draw the posterior distribution for $\mu$, given the data;
+    -  evaluate mean, median and variance, both analytically and numerically in R.
+
+
+2. Suppose a Jeffrey’s prior for the parameter $\mu$
+    -  determine and draw the posterior distribution for $\mu$, given the data;
+    -  evaluate mean, median and variance, both analytically and numerically in R.
+
+
+3. Evaluate a $95\%$ credibility interval for the results obtained with both priors. Compare the result with that obtained using a normal approximation for the posterior distribution, with the same mean and standard deviation.
+<!-- #endregion -->
+
+## Solution
+
+The Likelihood of several indipendent Poisson processes is given by the product of Poisson distribution:
+
+$$f\left(\left\{x_{j}\right\} | \mu\right)=\prod_{j=1}^{n} f\left(x_{j} | \mu\right) \quad \propto \quad \mu^{\sum x_{j}} \times \mathrm{e}^{(-n \mu)}$$
+
+which is analogue to a Gamma distribution:
+
+$$\begin{array}{c}
+\operatorname{Gamma}(x | \alpha, \lambda)=k x^{\alpha-1} \mathrm{e}^{-\lambda x} 
+\end{array}$$
+
+with 
+$$\begin{array}{c}
+k=\frac{\lambda^{\alpha}}{\Gamma(\alpha)} \\
+\end{array}$$
+
+### Uniform prior
+
+In the case of a uniform prior $g(\mu)=1 \forall \mu>0$, the Posterior is: 
+
+$$\begin{aligned}
+P\left(\mu |\left\{x_{j}\right\}\right) & \propto f\left(\left\{x_{j}\right\} | \mu\right) \times g(\mu) \\
+& \propto \mu^{\sum x_{j}} \mathrm{e}^{-n \mu}
+\end{aligned}$$
+
+which is exactly a renormalization of the Gamma function defined above, in particular:
+
+$$ \Gamma(\alpha'=\Sigma x_{j}+1, \lambda' = n) = \Gamma(13, 5)$$
+
+```{r}
+alpha <- 13
+n <- 5
+n.sample <- 2000
+mu_min <- 0
+mu_max <- 10
+mu <- seq(mu_min, mu_max, length.out = n.sample)
+
+post_gamma <- dgamma(mu, alpha, n)  
+
+###-----ANALYTICAL SOLUTIONS-----###
+
+mean <- alpha/n
+var <- alpha/(n^2)
+
+#The median has no analytical expression
+
+###-----NUMERICAL SOLUTIONS-----###
+
+dmu <- (mu_max-mu_min)/n.sample            
+
+mean_num <- dmu*sum(mu*post_gamma)
+median_num <- qgamma(0.5, alpha, n)
+var_num <- dmu*sum(mu*mu*post_gamma) - mean_num^2
+
+mu1 <- qgamma(0.025, alpha, n)
+mu2 <- qgamma(0.975, alpha, n)
+
+gaus <- dnorm(mu, mean, sqrt(var))
+
+mu1_norm <- mean - 1.96*sqrt(var)
+mu2_norm <- mean + 1.96*sqrt(var)
+
+###----------PLOT----------###
+
+options(repr.plot.width=8, repr.plot.height=8)  #to set graph size
+par(mar=c(5, 5, 4, 2))
+
+plot(mu, post_gamma, xaxs='i', yaxs='i', type='l', lwd = 3,
+     xlim=c(0,10), ylim=c(0,0.6), col = 'brown3',
+     main="Posterior with Uniform prior", cex.main=2.5,
+     xlab=expression(mu), ylab=expression(paste("P(", mu, " | ",alpha,", n, M)")), 
+     cex.lab=2, las=1)
+lines(mu, gaus, lwd = 3, lty=2, col='orange')
+abline(v=mean, col='grey', lty=2, lwd=2)
+abline(v=mu1, col='red', lty=4, lwd=2)
+abline(v=mu2, col='green', lty=4, lwd=2)
+abline(v=mean_num, col='black', lty=2, lwd=2)
+abline(v=mu1_norm, col='blue', lty=4, lwd=2)
+abline(v=mu2_norm, col='violetred', lty=4, lwd=2)
+
+legend('topright', col=c("red", "grey", "green",  "blue", "black", "violetred", "orange"), 
+       lty=c(4, 2, 4, 4, 2, 4, 2), bty='n', cex=1.5, lwd=3,
+       legend = c(parse(text = paste0(' ~mu[1] == ', round(mu1, 4))),
+                  parse(text = paste0(' ~bar(mu)[True] == ', round(mean, 4))),
+                  parse(text = paste0(' ~mu[2] == ', round(mu2, 4))),
+                  parse(text = paste0(' ~mu[1]^norm == ', round(mu1_norm, 4))),
+                  parse(text = paste0(' ~bar(mu)[Num] == ', round(mean_num, 4))),
+                  parse(text = paste0(' ~mu[2]^norm == ', round(mu2_norm, 4))),
+                  "Gaussian approx.")
+         )
+
+cat("-----------------------------------\n")
+cat("\"True\" values", '\n')
+cat("-----------------------------------\n")
+
+cat("Mean=", mean, '\n')
+cat("Variance=",var, '\n')
+cat("Median cannot be evaluated analytically.\n")
+
+cat("-----------------------------------\n")
+cat("Numerical estimation", '\n')
+cat("-----------------------------------\n")
+
+cat("Mean=", mean_num, '\n')
+cat("Variance=",var_num, '\n')
+cat("Median[numerical]=",median_num, '\n')
+
+cat("-----------------------------------\n")
+cat("95% Credibility Intervals", '\n')
+cat("-----------------------------------\n")
+cat("95%C.I. = [", mu1, "; ", mu2,"]", 
+    "\n95%C.I.[normal approx.] = [", mu1_norm, "; ", mu2_norm,"]", '\n')
+
+
+```
+### Jeffrey's prior
+
+In the case of a Jeffrey's prior $g(\mu) \propto \frac{1}{\sqrt{\mu}} \forall \mu>0$, the Posterior is: 
+
+$$\begin{aligned}
+P\left(\mu |\left\{x_{j}\right\}\right) & \propto f\left(\left\{x_{j}\right\} | \mu\right) \times g(\mu) \\
+& \propto \mu^{\sum x_{j}} \mathrm{e}^{-n \mu} \times \frac{1}{\sqrt{\mu}} \\
+& \propto \mu^{\sum x_{j}-1 / 2} \mathrm{e}^{-n \mu}
+\end{aligned}$$
+
+which is again a renormalization of the Gamma function defined above, in particular:
+
+$$ \Gamma(\alpha'=\Sigma x_{j}+\frac{1}{2}, \lambda'= n) = \Gamma(12.5, 5)$$
+
+
+
+```{r}
+alpha <- 12.5
+n <- 5
+n.sample <- 2000
+mu_min <- 0
+mu_max <- 10
+mu <- seq(mu_min, mu_max, length.out = n.sample)
+
+post_gamma <- dgamma(mu, alpha, n)  
+
+###-----ANALYTICAL SOLUTIONS-----###
+
+mean <- alpha/n
+var <- alpha/(n^2)
+
+#The median has no analytical expression
+
+###-----NUMERICAL SOLUTIONS-----###
+
+dmu <- (mu_max-mu_min)/n.sample            
+
+mean_num <- dmu*sum(mu*post_gamma)
+median_num <- qgamma(0.5, alpha, n)
+var_num <- dmu*sum(mu*mu*post_gamma) - mean_num^2
+
+mu1 <- qgamma(0.025, alpha, n)
+mu2 <- qgamma(0.975, alpha, n)
+
+gaus <- dnorm(mu, mean, sqrt(var))
+
+mu1_norm <- mean - 1.96*sqrt(var)
+mu2_norm <- mean + 1.96*sqrt(var)
+
+###----------PLOT----------###
+
+options(repr.plot.width=8, repr.plot.height=8)  #to set graph size
+par(mar=c(5, 5, 4, 2))
+
+plot(mu, post_gamma, xaxs='i', yaxs='i', type='l', lwd = 3,
+     xlim=c(0,10), ylim=c(0,0.6), col = 'brown3',
+     main="Posterior with Jeffrey's prior", cex.main=2.5,
+     xlab=expression(mu), ylab=expression(paste("P(", mu, " | ",alpha,", n, M)")), 
+     cex.lab=2, las=1)
+lines(mu, gaus, lwd = 3, lty=2, col='orange')
+abline(v=mean, col='grey', lty=2, lwd=2)
+abline(v=mu1, col='red', lty=4, lwd=2)
+abline(v=mu2, col='green', lty=4, lwd=2)
+abline(v=mean_num, col='black', lty=2, lwd=2)
+abline(v=mu1_norm, col='blue', lty=4, lwd=2)
+abline(v=mu2_norm, col='violetred', lty=4, lwd=2)
+
+legend('topright', col=c("red", "grey", "green",  "blue", "black", "violetred", "orange"), 
+       lty=c(4, 2, 4, 4, 2, 4, 2), bty='n', cex=1.5, lwd=3,
+       legend = c(parse(text = paste0(' ~mu[1] == ', round(mu1, 4))),
+                  parse(text = paste0(' ~bar(mu)[True] == ', round(mean, 4))),
+                  parse(text = paste0(' ~mu[2] == ', round(mu2, 4))),
+                  parse(text = paste0(' ~mu[1]^norm == ', round(mu1_norm, 4))),
+                  parse(text = paste0(' ~bar(mu)[Num] == ', round(mean_num, 4))),
+                  parse(text = paste0(' ~mu[2]^norm == ', round(mu2_norm, 4))),
+                  "Gaussian approx.")
+         )
+
+cat("-----------------------------------\n")
+cat("\"True\" values", '\n')
+cat("-----------------------------------\n")
+
+cat("Mean=", mean, '\n')
+cat("Variance=",var, '\n')
+cat("Median cannot be evaluated analytically.\n")
+
+cat("-----------------------------------\n")
+cat("Numerical estimation", '\n')
+cat("-----------------------------------\n")
+
+cat("Mean=", mean_num, '\n')
+cat("Variance=",var_num, '\n')
+cat("Median[numerical]=",median_num, '\n')
+
+cat("-----------------------------------\n")
+cat("95% Credibility Intervals", '\n')
+cat("-----------------------------------\n")
+cat("95%C.I. = [", mu1, "; ", mu2,"]", 
+    "\n95%C.I.[normal approx.] = [", mu1_norm, "; ", mu2_norm,"]", '\n')
+
+```
+<!-- #region -->
+# Exercise 2
+
+Given the problem of the lightouse, study the case in which both the position along the shore $(\alpha)$ and the distance out at sea $(\beta)$ are unknown.
+
+## Solution
+
+First of all, we assume a uniform distribution as Likelihood for $\theta_k \in [-\frac{\pi}{2},\frac{\pi}{2}]$ (angles of emission):
+
+$$P(\theta_k | \alpha, \beta)=\frac{1}{\pi}$$
+
+which is linked to the parameters $\alpha$ and $\beta$ with the following expression:
+
+$$x_{k} = \alpha+ \beta \tan (\theta_{k})$$.
+
+Applying a change of variables, one obtains a Cauchy distribution for $x_k$ as follows:
+
+$$P\left(x_k | \alpha, \beta\right)=\frac{1}{\pi} \frac{\beta}{\left(x_k-\alpha \right)^{2}+\beta^{2}}$$
+
+which means, as the signals are all indipendent, that the Likelihood $P\left(x  | \alpha, \beta\right)$ will be equal to the product of all the single Likelihoods, i.e.:
+
+$$P\left(x | \alpha, \beta\right)=\prod_k P\left(x_k | \alpha, \beta\right)$$
+
+It can be noted that this is a two parameters problem ($\alpha$ and $\beta$): two prior distributions $P(\alpha)$, $P(\beta)$ are required. Moreover, to solve it, an important assumption is the indipendece of the two distributions, which allow us to write the following expression for Bayes theorem:
+
+$$P\left(\alpha, \beta | x_{k}\right) \propto P\left(x_{k} | \alpha, \beta\right) P(\alpha)P(\beta)$$
+
+Both priors can be assumed as uniform in their ranges $ x \in\left[x_{\min }, x_{\max }\right] $, $y \in\left[0, y_{\max }\right]$:
+
+$$P(\alpha)=\left\{\begin{array}{cl}
+\frac{1}{x_{\max }-x_{\min }} & \text { for } \alpha \in\left[x_{\min }, x_{\max }\right] \\
+0 & \text { otherwise }
+\end{array}\right.$$
+
+
+$$P(\beta)=\left\{\begin{array}{cl}
+\frac{1}{y_{\max }} & \text { for } \beta \in\left[0, y_{\max }\right] \\
+0 & \text { otherwise }
+\end{array}\right.$$
+
+With this assumptions, the final posterior will be a renormalization (represented by parameter $Z$) of the Likelihood due to Bayes theorem. 
+
+$$\log \left(P\left( \alpha, \beta | x \right) \right)= \log \frac{1}{Z} \prod_k P\left(x_k | \alpha, \beta\right) = \log \frac{1}{Z} \prod_k\frac{1}{\pi} \frac{\beta}{\left(x_k-\alpha \right)^{2}+\beta^{2}} = \text{const} - \sum_k \log( (x_k - \alpha) + \beta^2 )$$
+
+The best parameter estimation is computed taking the maximum of the log-Posterior pdf for both $\alpha$ and $\beta$.
+<!-- #endregion -->
+
+```{r}
+###----------Generate data----------###
+
+set.seed(2020) 
+
+#number of total data generated
+n.sample <- 1000
+
+#grid discretization
+n.grid <- 100
+#alpha range = [x.min, x.max]
+x.min <- -6
+x.max <- +6
+h <- (x.max - x.min)/n.grid
+
+#beta range = [0, y.max]
+y.max <- 5
+k <- y.max/n.grid
+
+#grid for alphas and betas
+alphas <- seq(from=x.min, by=h, length.out=n.grid)
+betas <- seq(from=k, by=k, length.out=n.grid)
+
+#data generation of n angles with uniform distribution, then converted in xs
+gen_data <- function(n, alpha, beta) {
+    angles <- runif(n, min=-pi/2, max=pi/2)
+
+    xs <- beta * tan(angles) + alpha
+
+    return(xs)
+}
+
+#true values of alpha and beta, randomly picked
+alpha <- runif(1, x.min, x.max)
+beta <- runif(1, 0, y.max)
+data <- gen_data(n.sample, alpha, beta)
+
+#select the first n.plot points to represent how the posterior evolves with an increasing number of data
+n.str <- readline("Enter data set dimension: ")
+n.plot <- as.numeric(unlist(strsplit(n.str, ",")))
+dt <- data[1:n.plot]
+
+cat("True position: [", alpha, ",", beta, "]\n")
+```
+
+```{r}
+#It is easier to work with logarithms and then take the exponential
+#The following function computes the log-posterior Cauchy pdf:
+#since the prior(alpha) and prior(beta) are uniform, they do not change its shape
+
+#x is our data
+#returns a function of alphas given beta
+log_posterior <- function (x, beta) {          
+  Vectorize(function (alpha) {
+              sum( log((beta/pi) / (beta^2 + (x - alpha)^2)) )
+           })
+}
+
+#create the log-posterior as function of all betas
+log_post_b <- log_posterior(dt, betas)      #is a function
+
+#function to make the exponential of the posterior
+posterior <- function(as, log_post) {
+  log_alphas    <- log_post(as)             # compute log posterior for alpha-grid of values
+  log_alpha_max <- max(log_alphas)          # find the max alpha --> estimator for best parameter 
+  alphas <- exp(log_alphas - log_alpha_max) # compute posterior by exp(log(post))
+}
+
+#to take also beta into account, I create another function to calculate the "2d" log-posterior 
+log_post_2d <- function (x_k, alfa, beta) {
+  sum( log((beta/pi) / (beta^2 + (x_k - alfa)^2)) )
+}
+
+#to combine alpha-beta grid I create a function to calculate the log posterior for both of them
+#it is of course vectorized
+create_grid <- Vectorize(function(a, b){ log_post_2d(dt, a, b) } )
+
+#outer function takes two vectors and a function and builds a matrix 
+#by calling the given function for each combination of the elements in the two vectors 
+log_grid <- outer(alphas, betas, create_grid)
+
+#produce a matrix combining the grid values and the previously determined log_post_b
+posterior_2d <- matrix(posterior(log_grid, log_post_b), nrow=length(alphas), ncol=length(betas))
+
+#still need to normalize
+posterior_2d <- posterior_2d/(k*h*sum(posterior_2d))
+
+```
+
+```{r}
+options(repr.plot.width=16, repr.plot.height=7)  #to set graph size
+par(mfrow= c(1,2), mar=c(5, 5, 4, 2))
+
+contour(alphas, betas, posterior_2d, las=1, labcex=0.5,
+        xlim=c(x.min-0.1,x.max+0.1), ylim=c(-0.1,y.max+0.1),
+        nlevels = 6, lwd=2, cex.main= 2.5, cex.lab=2,
+        xlab=expression(alpha), ylab=expression(beta), 
+        main=expression(paste('p(', alpha, ', ', beta,' | x)')) )
+points(alpha, beta, pch=4, col="red", lwd=3)   # true position
+legend("topleft", bty='n', c(parse(text = paste0(' "True position, " ~n == ', n.plot))), 
+       col="red", pch=4, pt.cex=3, cex=1.5) 
+
+contour(alphas, betas, posterior_2d, las=1, labcex=0.8,
+        xlim=c(alpha-1.5, alpha+1.5), ylim=c(beta-1.5,beta+1.5),
+        nlevels = 6, lwd=2, cex.main= 2.5, cex.lab=2,
+        xlab=expression(alpha), ylab=expression(beta), 
+        main=expression(paste('p(', alpha, ', ', beta,' | x) [more zoomed]')))
+points(alpha, beta, pch=4, col="red", lwd=3)   # true position
+legend("topleft", bty='n', c(parse(text = paste0(' "True position, " ~n == ', n.plot))), 
+       col="red", pch=4, pt.cex=3, cex=1.5) 
+
+```
+
+```{r}
+options(repr.plot.width=8, repr.plot.height=8)  #to set graph size
+
+persp(alphas, betas , posterior_2d,
+      xlab="alpha", ylab="beta", zlab="",
+      cex.lab=1.5, lwd=1, border='ivory4',
+      xlim=c(x.min,x.max), ylim=c(0,y.max), zlim=c(0,max(posterior_2d)),
+      theta=65, phi=45, d=3, col = "aquamarine", shade = 0.3)
+title(main=expression(paste('3D p(', alpha, ', ', beta,' | x)')), cex.main=2.5)
+```
+
+<!-- #region -->
+# Exercise 3
+
+Given the *Signal over Background* example previously discussed, analyze and discuss the following cases:
+
+1. vary the sampling resolution used to generate the data, keeping the same sampling range `xdat <- seq(from=-7*w, to=7*w, by=s*w)`
+    - change the resolution $s=\{0.1,0.25,1,2,3\}$;
+    - check the effect on the results.
+    
+
+2.  Change the ratio $A/B$ used to simulate the data (keeping both positive in accordance with the prior):
+    - check the effect on the results
+
+
+## Solution
+
+### 1. Changing $s$
+<!-- #endregion -->
+
+```{r}
+# - Generative model
+signal <- Vectorize(function(x, a, b, x0, w, t) {
+    t * (a*exp(-(x-x0)^2/(2*w^2)) + b)
+})
+
+# - Sampling grid for computing posterior
+alim    <- c(0.0, 5.0)
+blim    <- c(0.2, 2.0)
+Nsamp   <- 100
+uniGrid <- seq(from=1/(2*Nsamp),to=1-1/(2*Nsamp), by=1/Nsamp)
+delta_a <- diff(alim)/Nsamp
+delta_b <- diff(blim)/Nsamp
+a <- alim[1] + diff(alim)*uniGrid
+b <- blim[1] + diff(blim)*uniGrid
+
+# Log posterior
+log.post <- function(d, x, a, b, x0, w, t) {
+    if(a<0 || b <0) {return(-Inf)} 
+    # the effect of the prior
+    sum(dpois(d, lambda=signal(x, a, b, x0, w, t), log=TRUE))
+}
+
+```
+
+```{r}
+# - Define model parameters
+
+x0      <- 0                                         # Signal peak
+w       <- 1                                         # Signal width 
+s       <- c(0.1, 0.25, 1, 2, 3)                # Change the sampling resolution within the same sampling range
+A.true  <- 2                                         # Signal amplitude
+B.true  <- 1                                         # Background amplitude
+Delta.t <- 5                                         # Exposure time
+
+options(repr.plot.width=16, repr.plot.height=26)     #to set graph size
+par(mfrow= c(5,2), mar=c(5, 5, 4, 2))
+
+for (i in 1:length(s)){
+    xdat    <- seq(from=-7*w, to=7*w, by=s[i]*w)
+    s.true <- signal(xdat, A.true, B.true, x0, w, Delta.t)
+    ddat   <- rpois(length(s.true), s.true)
+    
+    xplot <- seq(from=min(xdat), to=max(xdat), by=0.05*w)
+    splot <- signal(xplot, A.true, B.true, x0, w, Delta.t)
+    xdat.off <- xdat-(s[i]/2)
+    
+    ###----------PLOT----------###
+    
+    plot(xplot, splot, xlab="x", ylab="Signal+Background counts",
+         xaxs='i', yaxs='i', type='l', lwd = 3, 
+         ylim=c(0, max(ddat, splot)+0.2), #xlim=c(-7.2,7.2), 
+         col = 'dodgerblue', main=parse(text = paste0('s == ', s[i])),
+         cex.main=2.5, cex.lab=1.5, las=1) 
+    lines(xdat.off, ddat, type='s', col='orangered', xlab="", ylab="")
+    
+    # Compute log unnormalized posterior, z = ln P*(a,b|D), on a regular grid
+    z <- matrix(data=NA, nrow=length(a), ncol=length(b))
+    fill_matrix <- function(a,b){ log.post(ddat, xdat, a, b, x0, w, Delta.t) }
+
+    z <- outer(a, b, Vectorize(fill_matrix))
+
+    z <- z - max(z)   # set maximum to zero
+    norm <- sum(exp(z))
+    norm_z <- exp(z)/(delta_a*delta_b*norm)
+
+    # Plot normalized 2D posterior as contours
+    
+    contour(a, b, norm_z, nlevels = 5, labcex = 0.8, 
+            lwd = 2, las=1, cex.main= 2.5, cex.lab=2,
+            xlim=c(min(a)-0.1, max(a)+0.1), ylim=c(min(b)-0.1,max(b)+0.1),
+            xlab="Amplitude , A", ylab="Background , B",
+            main=parse(text = paste0('s == ', s[i])))
+    abline(v=2,h=1,col="grey")
+    
+}
+```
+
+Reducing the sampling resolution $s$ (hence, increasing the number of collected data) results in a very narrow posterior distribution, well centered around the "true" values of $A, B$. When we have fewer data, the posterior is wide and not precise.
+
+### 2. Changing $A/B$ ratio
+
+As the important feature is the ratio signal vs. background, I keep the background noise fixed to $B=1$ and change $A$ in a range $[0.1, 0.5, 1, 2, 4]$.
+
+```{r}
+# - Define model parameters
+
+x0      <- 0                      # Signal peak
+w       <- 1                      # Signal width (chosen within selected values)
+A.true  <- c(0.2, 0.5, 1, 2, 4)   # Signal amplitude
+B.true  <- 1                      # Background amplitude
+Delta.t <- 5                      # Exposure time
+
+options(repr.plot.width=16, repr.plot.height=26)  #to set graph size
+par(mfrow= c(5,2), mar=c(5, 5, 4, 2))
+
+for (i in 1:length(A.true)){
+    xdat   <- seq(from=-7*w, to=7*w, by=0.5*w)
+    s.true <- signal(xdat, A.true[i], B.true, x0, w, Delta.t)
+    ddat   <- rpois(length(s.true), s.true)
+    
+    xplot <- seq(from=min(xdat), to=max(xdat), by=0.05*w)
+    splot <- signal(xplot, A.true[i], B.true, x0, w, Delta.t)
+    xdat.off <- xdat-0.25
+    
+    ###----------PLOT----------###
+    
+    plot(xplot, splot, xlab="x", ylab="Signal+Background counts",
+         xaxs='i', yaxs='i', type='l', lwd = 3, 
+         xlim=range(xplot), ylim=c(0, max(ddat, splot)+0.2),
+         col = 'dodgerblue', main=parse(text = paste0('A/B == ', A.true[i])),
+         cex.main=2.5, cex.lab=1.5, las=1) 
+    lines(xdat.off, ddat, type='s', col='orangered', xlab="", ylab="")
+
+    # Compute log unnormalized posterior , z = ln P*(a,b|D), on a regular grid
+    z <- matrix(data=NA, nrow=length(a), ncol=length(b))
+    fill_matrix <- function(a,b){ log.post(ddat, xdat, a, b, x0, w, Delta.t) }
+
+    z <- outer(a, b, Vectorize(fill_matrix))
+
+    z <- z - max(z)   # set maximum to zero
+    norm <- sum(exp(z))
+    norm_z <- exp(z)/(delta_a*delta_b*norm)
+
+    # Plot normalized 2D posterior as contours
+    
+    contour(a, b, norm_z, nlevels = 5, labcex = 0.8, 
+            lwd = 2, las=1, cex.main= 2.5, cex.lab=2,
+            xlim=c(min(a)-0.1, max(a)+0.1), ylim=c(min(b)-0.1,max(b)+0.1),
+            xlab="Amplitude , A", ylab="Background , B",
+            main=parse(text = paste0('A/B == ', A.true[i])))
+    abline(v=A.true[i],h=B.true,col="grey")
+    
+}
+```
+
+Increasing the signal to noise ratio makes the posterior become more centered around the "true" amplitude value, as the noise is less relevant and the signal more significant.

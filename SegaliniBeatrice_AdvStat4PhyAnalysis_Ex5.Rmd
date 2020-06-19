@@ -1,0 +1,537 @@
+# Exercise 1
+
+A publishing company has recently launched a new journal.  In order to determine how effective it is in reaching its possible audience, a market survey company selects a random sample of people from a possible target audience and interviews them. Out of $150$ interviewed people, $29$ have read the last issue of the journal.
+
+1. What kind of distribution would you assume for $y$, the number of people that have seen the last issue of the journal?
+1. Assuming a uniform prior, what is the posterior distribution for $y$?
+1. Plot both posterior and likelihood ditributions functions.
+
+
+## Solution
+
+**1.** It is reasonable assume as Likelihood for $y$ a binomial distribution with probability $p=\frac{29}{150}$, $n=150$, since all the people are "indipendent" and may or may not have read the journal, i.e.:
+
+$$P(y | p, n, M)={n\choose y} p^{y}(1-p)^{n-y} = 
+\binom{150}{y} \left(\frac{29}{150}\right)^{y} \left(\frac{121}{150}\right)^{150-y} \quad \text { with } \quad y \leq n=150$$
+
+**2.** Since we assumed a uniform prior $P(p | M) \sim \mathcal{U}(0,1)$, the Posterior $P(p | y, n, M)$ will be proportional to the Likelihood we chose, hence a renormalized binomial distribution:
+
+$$P(p | y, n, M)=\frac{1}{Z} p^{y}(1-p)^{n-y}=\frac{1}{Z} P^{*}(p | y, n, M)$$
+
+with $Z$ as normalization factor.
+
+**3.** The Likelihood and Posterior are plotted below.
+
+```{r}
+options(repr.plot.width=16, repr.plot.height=8)  #to set graph size
+par(mfrow=c(1,2),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+n <- 150
+succ <- 29
+p <- succ/n
+x <- seq(0,150)
+probs <- seq(0, 1, length.out = 201)
+
+like <- dbinom(x, n, p)                    #likelihood
+post_nn <- dbinom(succ, n, probs)          #non-normalized posterior
+post <- 201*post_nn/sum(post_nn)           #posterior normalized
+
+###----------PLOT----------###
+
+plot(x, like, xaxs='i', yaxs='i', type='l', lwd = 3,
+     xlim=c(0,150), ylim=c(0,0.1), col = 'chartreuse3',
+     main="Likelihood as a function of y", cex.main=2,
+     xlab="y", ylab="P(y | p, n, M)", cex.lab=1.5, las=1)
+
+plot(probs, post, xaxs='i', yaxs='i', type='l', lwd = 3,
+     xlim=c(0,1), ylim=c(0,13), col = 'brown3',
+     main="Posterior as a function of p", cex.main=2,
+     xlab="p", ylab="P(p | y, n, M)", 
+     cex.lab=1.5, las=1)
+```
+<!-- #region -->
+# Exercise 2
+
+Three  students  want  to  construct  their  prior  probability  about  the  proportion  of  residents  that support the building of a new concert hall in their small town.
+
+- Anna thinks that her prior is a beta distribution with mean $0.2$ and a standard deviation of $0.08$.
+- Benny moved only recently to this new town and therefore he does not have the slightest idea about it.  Therefore he decides to use a uniform prior.
+- Chris believes that his prior should have a trapezoidal shape $f(x)$:
+
+$$ f(x)=\left\{\begin{array}{cl}
+20 x & 0 \leq x<0.1 \\
+2 & 0.1 \leq x<0.3 \\
+5-10 x & 0.3 \leq x < 0.5 \\
+0 & x \geq 0.5
+\end{array}\right.$$
+
+1. Draw and compare the three prior distributions.
+
+The next day the three students decide to interview a sample of $100$ citizens of the small town, asking for their opinion.  Out of the interviewed sample, $26$ support the building of the new concerthall.
+
+2. Evaluate and draw the three posterior distributions.
+3. Give an estimate of the most probable value and the $95\%$ credibility interval.
+
+
+## Solution
+
+**1.** Anna's prior has the following expression:
+
+$$Beta(p | \alpha, \beta, M) =\frac{1}{\mathrm{B}(\alpha, \beta)} p^{\alpha-1}(1-p)^{\beta-1}$$
+
+where $\alpha= \mu\left(\frac{\mu(1-\mu)}{\operatorname{var}}-1\right)= 4.8$ and $\beta= (1-\mu)\left(\frac{\mu(1-\mu)}{\operatorname{var}}-1\right)=19.2$, with $\mu=0.2$, var$=0.0064<\mu(1-\mu)=0.16$ and $\mathrm{B}(\alpha, \beta)$ its normalization factor.
+
+
+Benny's prior is just the uniform prior:
+
+$$P(p | M) = \mathcal{U}(0,1) = Beta(\alpha=1, \beta=1)$$ 
+
+Finally, Chris' one follows the trapezoidal shape of $f(x)$ (defined above). The so-defined distribution is not normalized - a normalization factor $N=\frac{10}{7}$ is added in the code definition to represent it correctly.
+
+The plots of all the three are displayed below, as functions of $p$.
+<!-- #endregion -->
+
+```{r}
+options(repr.plot.width=18, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,3),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+p <- seq(0, 1, length.out = 201)
+
+alpha <- 4.8
+beta  <- 19.2
+
+prior_a <- dbeta(p, alpha, beta)
+
+prior_b <- dunif(p, 0, 1)
+
+prior_c <- Vectorize(function(x){
+    y <- ifelse ( (x<0.1 & x>=0),
+                   20*x,
+                   ifelse((x<0.3 & x>=0.1),
+                           2,
+                          ifelse((x<0.5 & x>=0.3),
+                                  5-10*x,
+                                  0)
+                         )
+                )
+    return(y/0.7)  #with normalization
+})
+
+###----------PLOT----------###
+
+plot(p, prior_a, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'darkgoldenrod1', main="Anna's beta prior", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0, 5.15),
+     xlab="p", ylab="P(p | M)", cex.lab=1.5, las=1)
+
+plot(p, prior_b, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'purple', main="Benny's uniform prior", 
+     cex.main=2.5, xlim=c(-0.05,1.05),
+     xlab="p", ylab="P(p | M)", cex.lab=1.5, las=1)
+
+plot(p, prior_c(p), xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'blue', main="Chris' trapeziodal prior", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0, 3),
+     xlab="p", ylab="P(p | M)", cex.lab=1.5, las=1)
+```
+
+**2.** Similarly to the previous exercise, the Likelihood of $x$ (number of people approving the building of a new concert hall) could be assumed to be a binomial distribution with $n=100$, $p=26/100$:
+
+$$P(x | p, n, M)={n\choose x} p^{x}(1-p)^{n-x} = 
+\binom{100}{x} \left(\frac{26}{100}\right)^{x} \left(\frac{74}{100}\right)^{100-x} \quad \text { with } \quad x \leq n=100$$
+
+As a consequence, after the data collection, Anna's posterior will be a Beta distribution with $\bar{\alpha}= \alpha + r = 0.5 + 26 = 26.5$ and $\bar{\beta}= \beta + n - r = \beta + 100 - 26 = 76$, for the property of the Beta prior chosen.
+
+For the uniform prior, the solution is just the same as exercise **1**: we have again a binomial tendency with a different normalization factor $Z$.
+
+Finally, as it is known that Posterior $\propto$ Likelihood $\times$ Prior, for Chris' prior we have:
+
+$$P(p | x, M)=\frac{1}{K} P(x | p, M) P(p | M) = \frac{1}{K} p^{x} (1-p)^{n-x} \cdot f(p) $$
+
+with $K$ a normalization factor.
+
+```{r}
+n <- 100
+r <- 26
+
+alpha_post <- 4.8+26                             #alpha + r
+beta_post  <- 19.2+100-26                        #beta + n - r
+
+n.sample <- 2000                                 #discretization
+delta.p <- 1/n.sample
+
+p <- seq(from=1/(2*n.sample),by=1/n.sample, length.out=n.sample)
+
+likelihood <- dbinom(r, n, p)
+
+post_a <- dbeta(x=p, alpha_post, beta_post)      
+mean_a <- delta.p*sum(p*post_a)                  #mean evaluated numerically
+
+post_u <- dbinom(x=r, size=n, prob=p)            #non-normalized posterior
+post_b <- post_u/(delta.p*sum(post_u))           #normalized posterior
+
+mean_b <- delta.p*sum(p*post_b)                  #mean evaluated numerically
+
+supp_c <- likelihood*prior_c(p)                  #non-normalized posterior (product of likelihood and prior)
+post_c <- supp_c/(delta.p*sum(supp_c))           #normalized posterior
+mean_c <- delta.p*sum(p*post_c)                  #mean evaluated numerically
+
+###----------PLOT----------###
+
+options(repr.plot.width=18, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,3),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+plot(p, post_a, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'darkgoldenrod1', main="Anna's posterior", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0,10.5),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+abline(v=mean_a, col='black', lty=2)
+legend('topleft', bty='n', cex = 2,      
+       legend = parse(text = paste0('mu[Anna] == ', round(mean_a, 3)))
+       )
+
+plot(p, post_b, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'purple', main="Benny's posterior", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0,10.5),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+abline(v=mean_b, col='black', lty=2)
+legend('topleft', bty='n', cex = 2,      
+       legend = parse(text = paste0('mu[Benny] == ', round(mean_b, 3)))
+       )
+
+plot(p, post_c, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'blue', main="Chris' posterior", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0,10.5),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+abline(v=mean_c, col='black', lty=2)
+legend('topleft', bty='n', cex = 2,      
+       legend = parse(text = paste0('mu[Chris] == ', round(mean_c, 3)))
+       )
+
+```
+
+In the plots above, also the mean value is outlined with a dashed black line. To compare the mean values, a zoomed plot close to the peak of the distribution is performed.
+
+```{r}
+options(repr.plot.width=8, repr.plot.height=7)  #to set graph size
+
+plot(0, 0, type='n', main="Posteriors comparison", cex.main=2.5,
+     cex.lab=1.5, xlab="p", ylab="P(p | x, n, M)", 
+     xlim=c(0.2,0.3), ylim=c(0,10), las=1)
+
+lines(p, post_a, xaxs='i', yaxs='i', type='l', lwd = 3, col = 'darkgoldenrod1' )
+abline(v=mean_a, col='darkgoldenrod1', lty=2)
+
+lines(p, post_b, xaxs='i', yaxs='i', type='l', lwd = 3, col = 'purple')
+abline(v=mean_b, col='purple', lty=2)
+
+lines(p, post_c, xaxs='i', yaxs='i', type='l', lwd = 3, col = 'blue')
+abline(v=mean_c, col='blue', lty=2)
+
+legend('bottomleft', col=c("darkgoldenrod1", "purple", "blue"), 
+       lty=c(2, 2, 2), bty='n', cex = 1.5,      
+       legend = c(parse(text = paste0('mu[Anna] == ', round(mean_a, 3))),
+                  parse(text = paste0('mu[Benny] == ', round(mean_b, 3))),
+                  parse(text = paste0('mu[Chris] == ', round(mean_c, 3))))
+         )
+
+```
+
+**3.** The $95\%$ credibility interval is defined as:
+
+$$P\left(p_{1} \leq p<p_{2} | D, M\right)=\int_{p_{1}}^{p_{2}} P(p | D, M) d p \approx 0.95$$
+
+To find $p_1$, $p_2$, we choose to take the interval as "symmetric": hence, we compute the following integrals imposing each of them equal to $0.025$.
+
+$$P(p \leq p_{1} | D, M)=\int_{-\infty}^{p_{1}} P(p | D, M) d p = \int_{p_{2}}^{\infty} P(p | D, M) d p \stackrel{!}{=}0.025$$
+
+The computation of $p_1$ and $p_2$ is done analytically with the quantile function of the posterior distribution whenever possible, numerically otherwise.
+
+Note that the mean is not the most probable value (that is the *mode*).
+
+```{r}
+mode_a <- p[which.max(post_a)]                #probability associated to the maximum value of the posterior
+
+p1_a <- qbeta(0.025, alpha_post, beta_post)   #left border of C.I.
+p2_a <- qbeta(0.975, alpha_post, beta_post)   #right border of C.I.
+
+mode_b <- p[which.max(post_b)]                #probability associated to the maximum value of the posterior
+
+cum_b <- cumsum(post_b)/n.sample              #cumulative discrete function
+p1_b <- p[cum_b>=0.025][1]                    #left border of C.I.             
+p2_b <- p[cum_b>=0.975][1]                    #right border of C.I.
+
+mode_c <- p[which.max(post_c)]                #probability associated to the maximum value of the posterior
+
+cum_c <- cumsum(post_c)/n.sample              #cumulative discrete function
+p1_c <- p[cum_c>=0.025][1]                    #left border of C.I.             
+p2_c <- p[cum_c>=0.975][1]                    #right border of C.I.
+
+```
+
+```{r}
+options(repr.plot.width=18, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,3),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+plot(p, post_a, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'darkgoldenrod1', main="Anna's posterior", 
+     cex.main=2.5, xlim=c(-0.05,0.55), ylim=c(0,10.5),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+
+abline(v=mode_a, col='black', lty=2)
+abline(v=p1_a, col='red', lty=4)
+abline(v=p2_a, col='green', lty=4)
+
+legend(-0.1, 10.3, col=c("red", "black", "green"), 
+       lty=c(4, 2, 4), bty='n', cex=1.5, x.intersp=0.1, y.intersp=1.2,  
+       legend = c(parse(text = paste0('p[1] == ', round(p1_a, 3))),
+                  parse(text = paste0('Mo[A] == ', round(mode_a, 3))),
+                  parse(text = paste0('p[2] == ', round(p2_a, 3))))
+         )
+
+
+plot(p, post_b, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'purple', main="Benny's posterior", 
+     cex.main=2.5, xlim=c(-0.05,0.55), ylim=c(0,10.5),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+
+abline(v=mode_b, col='black', lty=2)
+abline(v=p1_b, col='red', lty=4)
+abline(v=p2_b, col='green', lty=4)
+
+legend(-0.1, 10.3, col=c("red", "black", "green"), 
+       lty=c(4, 2, 4), bty='n', cex=1.5, x.intersp=0.1, y.intersp=1.2,   
+       legend = c(parse(text = paste0('p[1] == ', round(p1_b, 3))),
+                  parse(text = paste0('Mo[B] == ', round(mode_b, 3))),
+                  parse(text = paste0('p[2] == ', round(p2_b, 3))))
+         )
+
+plot(p, post_c, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'blue', main="Chris' posterior", 
+     cex.main=2.5, xlim=c(-0.05,0.55), ylim=c(0,10.5),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+
+abline(v=mode_c, col='black', lty=2)
+abline(v=p1_c, col='red', lty=4)
+abline(v=p2_c, col='green', lty=4)
+
+legend(-0.1, 10.3, col=c("red", "black", "green"), 
+       lty=c(4, 2, 4),  bty='n', 
+       cex=1.5, x.intersp=0.1, y.intersp=1.2,    
+       legend = c(parse(text = paste0('p[1] == ', round(p1_c, 3))),
+                  parse(text = paste0('Mo[C] == ', round(mode_c, 3))),
+                  parse(text = paste0('p[2] == ', round(p2_c, 3))))
+         )
+
+```
+
+# Exercise 3
+
+A coin is flipped $n= 30$ times with the following outcomes:
+
+`T, T, T, T, T, H, T, T, H, H, T, T, H, H, H, T, H, T, H, T, H, H, T, H, T, H, T, H, H, H`
+
+1. Assuming a flat prior, and a beta prior, plot the likelihood, prior and posterior distributions for the data set.
+1. Evaluate the most probable value for the coin probability $p$ and, integrating the posterior probability distribution, give an estimate for a $95\%$ credibility interval.
+1. Repeat the same analysis assuming a sequential analysis of the data. Show how the most probable value and the credibility interval change as a function of the number of coin tosses (i.e.  from 1 to 30).
+1. Do you get a different result, by analyzing the data sequentially with respect to a one-step analysis (i.e.  considering all the data as a whole)?
+
+## Solution
+
+**1.** For the Beta prior, I assume $\alpha=\beta=10$ to have a simmetric distribution, since we expect the coin to be fairly balanced.
+
+The Likelihood is a binomial distribution with $n=30$, $p=1/2$, assuming we take the heads as "successes" and tails as "failures".
+
+The Posterior will be a renormalized Binomial distribution for a flat Prior, while a Beta distribution with $\alpha_p=\alpha + r$, $\beta_p= \beta + n - r$ for the Beta one.
+
+```{r}
+n <- 30
+r <- 15
+
+alpha_prior <- 10
+beta_prior  <- 10
+n.sample <- 2000
+delta.p <- 1/n.sample
+
+p <- seq(from=1/(2*n.sample),by=1/n.sample, length.out=n.sample)
+x <- seq(0, 30)
+
+likelihood <- dbinom(x, n, 1/2)
+
+prior_beta <- dbeta(p, alpha_prior, beta_prior)
+prior_flat <- dunif(p, 0, 1)
+
+post_beta <- dbeta(x=p, alpha_prior+r, beta_prior+n-r)
+
+flat_p <- dbinom(x=r, size=n, prob=p)
+post_flat <- flat_p/(delta.p*sum(flat_p))
+
+###----------PLOT----------###
+
+options(repr.plot.width=16, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,3),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+plot(x, likelihood, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'black', main="Likelihood", 
+     cex.main=2.5, ylim=c(0,0.16),
+     xlab="x", ylab="P(x | p, n, M)", cex.lab=2, las=1)
+
+plot(p, prior_flat, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'orangered', main="Priors", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0,4),
+     xlab="p", ylab="P(p | M)", cex.lab=2, las=1)
+lines(p, prior_beta, xaxs='i', yaxs='i', type='l', lwd = 3, 
+      col = 'slateblue4')
+legend('topleft', col=c('orangered','slateblue4'), 
+       legend=c("Uniform", "Beta"), cex=1.5, lty=c(1,1), bty='n')
+
+plot(p, post_flat, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'orangered', main="Posteriors", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0,6.4),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+lines(p, post_beta, xaxs='i', yaxs='i', type='l', lwd = 3, 
+      col = 'slateblue4')
+legend('topleft', col=c('orangered','slateblue4'),
+       legend=c("Uniform", "Beta"), cex=1.5, lty=c(1,1), bty='n')
+
+```
+
+**2.** The credible interval are considered symmetric as described in **Exercise 2**. The most probable value is again the _mode_ of the distribution.
+
+```{r}
+mode_beta <- p[which.max(post_beta)]
+
+p1_beta <- qbeta(0.025, alpha_prior+r, beta_prior+n-r)
+p2_beta <- qbeta(0.975, alpha_prior+r, beta_prior+n-r)
+
+mode_flat <- p[which.max(post_flat)]
+
+cum_flat <- cumsum(post_flat)/n.sample
+
+p1_flat <- p[cum_flat>=0.025][1]
+p2_flat <- p[cum_flat>=0.975][1]
+
+###----------PLOT----------###
+
+options(repr.plot.width=16, repr.plot.height=7)  #to set graph size
+par(mfrow=c(1,2),  mar=c(5, 5, 4, 2))            #graphs in the same row
+
+plot(p, post_flat, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'orangered', main="C.I. with Uniform prior", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0,6.4),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+abline(v=mode_flat, col='black', lty=2)
+abline(v=p1_flat, col='red', lty=4)
+abline(v=p2_flat, col='green', lty=4)
+
+legend(0.58, 6.4, col=c("red", "black", "green"), 
+       lty=c(4, 2, 4), bty='n', cex=1.2, x.intersp=0.1, y.intersp=1.2, 
+       legend = c(parse(text = paste0('p[1] == ', round(p1_flat, 3))),
+                  parse(text = paste0('Mo == ', round(mode_flat, 3))),
+                  parse(text = paste0('p[2] == ', round(p2_flat, 3))))
+         )
+
+plot(p, post_beta, xaxs='i', yaxs='i', type='l', lwd = 3, 
+     col = 'slateblue4', main="C.I. with Beta prior", 
+     cex.main=2.5, xlim=c(-0.05,1.05), ylim=c(0,6.4),
+     xlab="p", ylab="P(p | x, n, M)", cex.lab=2, las=1)
+abline(v=mode_beta, col='black', lty=2)
+abline(v=p1_beta, col='red', lty=4)
+abline(v=p2_beta, col='green', lty=4)
+
+legend(0.58, 6.4, col=c("red", "black", "green"), 
+       lty=c(4, 2, 4), bty='n', cex=1.2, x.intersp=0.1, y.intersp=1.2,      
+       legend = c(parse(text = paste0('p[1] == ', round(p1_beta, 3))),
+                  parse(text = paste0('Mo == ', round(mode_beta, 3))),
+                  parse(text = paste0('p[2] == ', round(p2_beta, 3))))
+         )
+
+```
+
+**3.** To show how the most probable value and the credibility interval change as a function of the number of coin tosses with a sequential analyisis, the boundaries of the Credibility Interval and the Mode evolution are represented as a function of the number of coin tosses.
+
+For the sequential analysis, a Uniform prior is assumed at the beginning ($Beta(\alpha=1, \beta=1)$), then, after each iteration, the estimated posterior becomes the prior of the next step.
+
+```{r}
+n.sample <- 2000
+delta.p <- 1/n.sample
+p <- seq(from=1/(2*n.sample),by=1/n.sample, length.out=n.sample)
+
+#starting number of successes
+r <- 0   
+
+#start with uniform prior
+prior <- dbeta(p, 1, 1)
+
+#empty vectors which will contain C.I. boundaries and Modes
+mode <- c(1:30)
+p1 <- c(1:30)
+p2 <- c(1:30)
+
+#List of coin tosses with H=1 and T=0
+tosses <- c(0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1)
+
+for(toss in 1:30){
+    r <- tosses[toss]
+    
+    #likelihood
+    l <- dbinom(r, 1, p)
+    supp <- l*prior
+    posterior <- supp/(delta.p*sum(supp))
+    
+    mode[toss] <- p[which.max(posterior)]
+    cumulative <- cumsum(posterior)/n.sample
+
+    p1[toss] <- p[cumulative>=0.025][1]
+    p2[toss] <- p[cumulative>=0.975][1]
+
+    prior <- posterior
+}
+
+```
+
+```{r}
+options(repr.plot.width=10, repr.plot.height=7)  #to set graph size
+par(mar=c(5, 5, 4, 2))            
+
+plot(1:30, mode, xaxs='i', yaxs='i', type='o', lwd = 3, 
+     col = 'darkblue', main="Mode and 95% C.I. - Sequential analysis", 
+     cex.main=2.5, xlim=c(0.5,30.5), ylim=c(-0.1,1),
+     xlab="#Toss", ylab="Mode", cex.lab=1.5, las=1)
+
+polygon(c(1:30, 30:1), c(p1, rev(p2)), col = rgb(0.596, 1, 0.98, alpha=0.3), border = NA)
+lines(1:30, p1, lty='dashed', lwd = 2, col='palegreen3')
+lines(1:30, p2, lty='dashed', lwd = 2, col='palegreen3')
+points(30, mode[30], pch=19, col='navy',)
+
+legend('topright', col=c("darkblue", "navy", "palegreen3"), 
+       lty=c('solid', 'blank', 'dashed'), pch=c(1,19,NA),
+       bty='n', cex=1.5,
+       legend = c("Mode evolution",
+                  parse(text = paste0(' Mode[Final] == ', round(mode[30], 3))),
+                  "C.I. Boundaries")
+         )
+
+```
+
+```{r}
+cat("-----------------------------------\n")
+cat("Beta prior, one-step analysis", '\n')
+cat("-----------------------------------\n")
+cat("Mode = ", mode_beta,"\n95%C.I. = [", p1_beta, "; ", p2_beta,"]", '\n')
+cat("-----------------------------------\n")
+cat("Uniform prior, one-step analysis", '\n')
+cat("-----------------------------------\n")
+cat("Mode = ", mode_flat,"\n95%C.I. = [", p1_flat, "; ", p2_flat,"]", '\n')
+cat("-----------------------------------\n")
+cat("Sequential anlysis", '\n')
+cat("-----------------------------------\n")
+cat("Mode = ", mode[30],"\n95%C.I. = [", p1[30], "; ", p2[30],"]")
+```
+
+**4.** Concerning the sequential analysis, it can be stated that, with the increasing knowledge of the dataset, the credibility intervals become narrower and the mode approaches the "true" value $\mu=0.5$.
+
+The final result is - reasonably - almost equal to the one obtained with the whole data.
+
+However, one can observe that the credibility interval is (very slightly) narrower if we use a $Beta$ prior, while for the uniform one and the sequential analysis we obtain the same boundaries.
+

@@ -1,0 +1,506 @@
+```{r}
+#install.packages("latex2exp")
+library("latex2exp")
+```
+
+# Exercise 1
+
+A researcher has collected $n= 15$ observations that are supposed to come from a **Normal distribution** with known variance $\sigma^2= 16$: 
+
+$\{26.8, 26.3, 28.3, 28.5, 16.3, 31.9, 28.5, 27.2, 20.9, 27.5, 28.0, 18.6, 22.3, 25.0, 31.5\}$
+
+Assuming a normal prior for $\mu$, $Norm(m= 20,s^2= 25)$:
+1.  determine  the  posterior  distribution $P(\mu|y_1, \dots, y_{15})$  and  find  the  posterior  mean  and  standard deviation;
+1. find the $95\%$ credibility interval for $\mu$;
+1. plot the posterior distribution, indicating on the same plot: the mean value, the standard deviation, and the $95\%$ credibility interval;
+1. repeat the analysis using a different prior $Norm(m= 30,s^2= 16)$ and plot, on the same graph the likelihood, the prior and the posterior;
+1. compare the credibility intervals obtained with the two priors.
+
+
+## Solution
+
+**1-2-3.** The variance of the distribution is known and the same for all the measurements, which are considered _indipendent_. Therefore, the Likelihood of a single observation $y_j$ can be described with:
+
+$$f(y_j | \mu, \sigma) \propto \exp \left[-\frac{1}{2 \sigma^{2}}(y_j-\mu)^{2}\right]$$
+
+and given the indipendece of the measurements:
+
+$$f(y | \mu, \sigma)=\prod_{j} f\left(y_{j} | \mu, \sigma\right)=\prod_{j} \frac{1}{\sqrt{2 \pi} \sigma} \exp \left[-\frac{\left(y_{j}-\mu\right)^{2}}{2 \sigma^{2}}\right]$$
+
+Assuming a Normal prior, one knows from Bayes theorem that the Posterior distribution is a Normal distribution $Norm(m^\prime, s^\prime)$ with mean and variance:
+
+$$\frac{1}{\left(s^{\prime}\right)^{2}}=\frac{\sigma^{2}+n s^{2}}{\sigma^{2} s^{2}} \quad \text { and } \quad m^{\prime}=\frac{1 / s^{2}}{n / \sigma^{2}+1 / s^{2}} m+\frac{n / \sigma^{2}}{n / \sigma^{2}+1 / s^{2}} \bar{y}$$
+
+where $\bar{y}$ is the average of the collected data and the other symbols are explained in the text of the exercise.
+
+The credibility interval is built by centering it on the mean $m^\prime$ and taking as boundaries $m^\prime \pm 1.96 s^\prime$.
+
+```{r}
+#Collected data
+data     <- c(26.8, 26.3, 28.3, 28.5, 16.3, 31.9, 28.5, 27.2, 20.9, 27.5, 28.0, 18.6, 22.3, 25.0, 31.5)
+n        <- 15
+y_bar    <- mean(data)
+sigma2   <- 16
+
+#Prior
+m        <- 20 
+s2       <- 25
+
+#Posterior
+m_prime  <- (m/(s2*((n/sigma2) + (1/s2)))) + (n*y_bar/(sigma2*((n/sigma2)+(1/s2))))
+s2_prime <- sigma2*s2/(sigma2+(n*s2))
+
+#Credibility interval boundaries
+ci_low   <- m_prime-1.96*sqrt(s2_prime)
+ci_up    <- m_prime+1.96*sqrt(s2_prime)
+
+#Compute posterior
+n.samp   <- 500
+dmu      <- 40/n.samp
+mu       <- seq(10, 50, by=dmu)
+post_n   <- dnorm(mu, m_prime, sqrt(s2_prime))
+
+###-----PLOT-----###
+
+options(repr.plot.width=8, repr.plot.height=8)  #to set graph size
+par(mar=c(5, 5, 4, 2))
+
+plot(mu, post_n, xaxs='i', yaxs='i', type='l', lwd = 3,
+     xlim=c(20, 35), ylim=c(0,0.42), col = 'chartreuse3', cex.main=2.5,
+     main= TeX(sprintf("\\textbf{Normal posterior, $\\s{\\prime}  = %g$}", round(sqrt(s2_prime), 4))),
+     xlab=expression(mu), ylab=expression(paste("P(", mu, " | y, M)")), 
+     cex.lab=2, las=1)
+polygon(c(m_prime-sqrt(s2_prime), mu[mu>=m_prime-sqrt(s2_prime) & mu<=m_prime+sqrt(s2_prime)], m_prime+sqrt(s2_prime)),
+        c(0, post_n[mu>=m_prime-sqrt(s2_prime) & mu<=m_prime+sqrt(s2_prime)], 0), 
+        col="burlywood1", border=NA)
+abline(v=m_prime, col='black', lty=2, lwd=2)
+abline(v=ci_low, col='deeppink', lty=4, lwd=2)
+abline(v=ci_up, col='deepskyblue', lty=4, lwd=2)
+
+legend(27.5, 0.42, col=c("chartreuse3", "deeppink", "black", "deepskyblue", "burlywood1"), 
+       lty=c(1, 4, 2, 4, 1), bty='n', cex=1.5, lwd=c(3, 3, 3, 3, 10), x.intersp=0.2,
+       legend = c("Posterior distribution",
+                  TeX(sprintf("$\\mu_1 = %g$", round(ci_low, 4))),
+                  TeX(sprintf("$\\m{\\prime} = %g$", round(m_prime, 4))),
+                  TeX(sprintf("$\\mu_2 = %g$", round(ci_up, 4))),
+                  TeX(sprintf("$\\s{\\prime} = %g$", round(sqrt(s2_prime), 4))))
+         )
+
+cat("-----------------------------------\n")
+cat("95% Credibility Intervals", '\n')
+cat("-----------------------------------\n")
+cat("Mean = ", round(m_prime, 4), 
+    "\nVariance = ", round(s2_prime,4 ), "\nStandard deviation = ", round(sqrt(s2_prime), 4),
+    "\n95%C.I. = [", round(ci_low, 4), "; ", round(ci_up, 4),"]", '\n')
+
+
+```
+
+**4.** As said before, the Likelihood of a set of indipendent measurements normally distributed with known variance $\sigma$ is:
+
+$$f(y | \mu, \sigma)=\prod_{j} f\left(y_{j} | \mu, \sigma\right)=\prod_{j} \frac{1}{\sqrt{2 \pi} \sigma} \exp \left[-\frac{\left(y_{j}-\mu\right)^{2}}{2 \sigma^{2}}\right]$$
+
+The same steps of point **1-2-3.** are repeated with a new prior $Norm(30,4)$.
+
+```{r}
+#New prior
+m        <- 30 
+s2       <- 16
+
+#Likelihood function
+like     <- Vectorize(function(mu) { prod(exp(-(data-mu)^2/(2*sigma2)))/(sqrt(2*pi*sigma2)) })
+
+#Posterior
+m_prime2 <- m/(s2*(n/sigma2 + 1/s2)) + n*y_bar/(sigma2*(n/sigma2+1/s2))
+s2_prime2<- sigma2*s2/(sigma2+n*s2)
+
+#Credibility interval boundaries
+ci_low2  <- m_prime2 - 1.96*sqrt(s2_prime2)
+ci_up2   <- m_prime2 + 1.96*sqrt(s2_prime2)
+
+#Compute Prior, Posterior and Likelihood
+n.samp   <- 500
+dmu      <- 40/n.samp
+mu       <- seq(10, 50, by=dmu)
+
+post_n   <- dnorm(mu, m_prime2, sqrt(s2_prime2))
+prior_n  <- dnorm(mu, m, sqrt(s2))
+
+like_n   <- like(mu)
+like_n   <- like_n/(sum(like_n)*dmu)
+```
+
+```{r}
+options(repr.plot.width=8, repr.plot.height=8)  #to set graph size
+par(mar=c(5, 5, 4, 2))
+
+plot(mu, post_n, xaxs='i', yaxs='i', type='l', lwd = 3,
+     xlim=c(15, 45), ylim=c(0,0.42), 
+     col = 'chartreuse3', cex.main=2.5,
+     main= "Probability distributions",
+     xlab=expression(mu), ylab="Probability", 
+     cex.lab=2, las=1)
+lines(mu, prior_n, xaxs='i', yaxs='i', type='l', lty=2, lwd = 3,
+      col = 'blue', cex.main=2.5,
+      xlab="", ylab="", cex.lab=2, las=1)
+lines(mu, like_n, xaxs='i', yaxs='i', type='l', lty=3, lwd = 3,
+      col = 'red', cex.main=2.5,
+      xlab="", ylab="", cex.lab=2, las=1)
+
+legend('topright', col=c("chartreuse3", "blue", "red"), 
+       lty=c(1, 2, 3), bty='n', cex=1.5, lwd=3, x.intersp=0.2,
+       legend = c("Posterior", "Prior", "Likelihood")
+       )
+
+cat("-----------------------------------\n")
+cat("95% Credibility Intervals", '\n')
+cat("-----------------------------------\n")
+cat("Mean = ", m_prime2, 
+    "\nVariance = ", s2_prime2, "\nStandard deviation = ", sqrt(s2_prime2),
+    "\n95%C.I. = [", ci_low2, "; ", ci_up2,"]", '\n')
+
+
+```
+
+**5.** By comparing the two Credibility Intervals, one could observe that they are similarly wide ($\Delta C.I._1 \approx \Delta C.I._2 \approx 3.9$), but shifted of about $0.5$. In fact, the two posteriors have similar standard deviation ($\approx 1$), but different means ($m^\prime_1=25.6$, $m^\prime_2=26.1$). As a consequence the intervals, which are computed simmetrically with respect to the mean of the posterior, result to be shaped as they are.
+
+
+# Exercise 2
+
+A researcher has collected $n= 16$ observations that are supposed to come from a **Normal distribution** with known variance $\sigma^2= 4$:
+
+$\{4.09, 4.68, 1.87, 2.62, 5.58, 8.68, 4.07, 4.78, 4.79, 4.49, 5.85, 5.09, 2.40, 6.27, 6.30, 4.47\}$
+
+Assuming the prior is a step funtion $g$:
+
+$$g(\mu)=\left\{\begin{array}{ll}
+\mu & \text { for } 0<\mu \leq 3 \\
+3 & \text { for } 3<\mu \leq 5 \\
+8-\mu & \text { for } 5<\mu \leq 8 \\
+0 & \text { for } \mu>8
+\end{array}\right.$$
+
+1. find the posterior distribution, the posterior mean and standard deviation;
+1. find the $95\%$ credibility interval for $\mu$;
+1. plot the posterior distribution, indicating on the same plot: the mean value, the standard deviation, and the $95\%$ credibility interval;
+1. plot, on the same graph, the prior, the likelihood and the posterior distribution.
+
+## Solution
+
+Thanks to Bayes theorem, the Posterior distribution will be:
+
+$$P(\mu | y, \sigma)=\frac{1}{K} P(y | \mu, \sigma) g(\mu ) = \frac{1}{K} \left( \prod_{j} \frac{1}{\sqrt{2 \pi} \sigma} \exp \left[-\frac{\left(y_{j}-\mu\right)^{2}}{2 \sigma^{2}}\right] \right) \cdot g(\mu) $$
+
+and it will be computed numerically, with $K$ a normalization factor.
+
+The credibility intervals are taken simmetrically by numerically integrating the posterior.
+
+```{r}
+#Collected data
+data     <- c(4.09, 4.68, 1.87, 2.62, 5.58, 8.68, 4.07, 4.78, 4.79, 4.49, 5.85, 5.09, 2.40, 6.27, 6.30, 4.47)
+n        <- length(data)
+y_bar    <- mean(data)
+sigma2   <- 4
+
+#Prior function
+g        <- Vectorize(function(x){
+       y <- ifelse ( (x<=3 & x>0),
+                      x,
+                      ifelse((x<=5 & x>3),
+                              3,
+                             ifelse((x<=8 & x>5),
+                                     8-x,
+                                     0)
+                            )
+                   )
+       return(y/15)  #with normalization
+})
+
+#Likelihood function
+like     <- Vectorize(function(mu) { prod(exp(-(data-mu)^2/(2*sigma2)))/(sqrt(2*pi*sigma2)) })
+
+#Compute Prior, Posterior and Likelihood
+n.samp   <- 500
+dmu      <- 8/n.samp
+mu       <- seq(0, 8, by=dmu)
+
+like_n   <- like(mu)
+like_n   <- like_n/(sum(like_n)*dmu) #normalized
+
+prior_g  <- g(mu)
+
+supp     <- like_n*prior_g           #non-normalized posterior (product of likelihood and prior)
+post_g   <- supp/(dmu*sum(supp))     #normalized posterior
+
+mu_bar   <- dmu*sum(mu*post_g)       #mean evaluated numerically
+
+var      <- dmu*sum(mu*mu*post_g)    
+var      <- var - mu_bar^2           #variance
+std      <- sqrt(var)                #standard deviation
+
+#Credibility interval boundaries
+cumul    <- cumsum(post_g*dmu)       #cumulative discrete function
+mu1      <- mu[cumul>=0.025][1]                   
+mu2      <- mu[cumul>=0.975][1]      
+
+```
+
+```{r}
+cat("-----------------------------------\n")
+cat("95% Credibility Intervals", '\n')
+cat("-----------------------------------\n")
+cat("Mean = ", mu_bar, 
+    "\nVariance = ", var, "\nStandard deviation = ", std, 
+    "\n95%C.I. = [", mu1, "; ", mu2,"]", '\n')
+
+options(repr.plot.width=18, repr.plot.height=8)  #to set graph size
+par(mfrow=c(1,2), mar=c(5, 5, 4, 2))
+
+plot(mu, post_g, xaxs='i', yaxs='i', type='l', lwd = 3,
+     xlim=c(0, 8), ylim=c(0,0.85), 
+     col = 'chartreuse3', cex.main=2.5,
+     main= TeX(sprintf("\\textbf{Posterior distribution, $\\sigma  = %g$}", round(std, 4))),
+     xlab=expression(mu), ylab="Probability", 
+     cex.lab=2, las=1)
+polygon(c(mu_bar-std, mu[mu>=mu_bar-std & mu<=mu_bar+std], mu_bar+std),
+        c(0, post_g[mu>=mu_bar-std & mu<=mu_bar+std], 0), 
+        col="burlywood1", border=NA)
+abline(v=mu_bar, col='black', lty=2, lwd=2)
+abline(v=mu1, col='deeppink', lty=4, lwd=2)
+abline(v=mu2, col='deepskyblue', lty=4, lwd=2)
+
+legend(-0.5, 0.85, col=c("chartreuse3", "deeppink", "black", "deepskyblue", "burlywood1"), 
+       lty=c(1, 4, 2, 4, 1), bty='n', cex=1.5, lwd=c(3, 3, 3, 3, 10), x.intersp=0.2,
+       legend = c("Posterior", 
+                  TeX(sprintf("$\\mu_1 = %g$", round(mu1, 4))),
+                  TeX(sprintf("$\\bar{\\mu} = %g$", round(mu_bar, 4))),
+                  TeX(sprintf("$\\mu_2 = %g$", round(mu2, 4))),
+                  TeX(sprintf("$\\sigma = %g$", round(std, 4))) )
+       )
+
+plot(mu, post_g, xaxs='i', yaxs='i', type='l', lwd = 3,
+     xlim=c(0, 8), ylim=c(0,0.85), 
+     col = 'chartreuse3', cex.main=2.5,
+     main= "Probability distributions",
+     xlab=expression(mu), ylab="Probability", 
+     cex.lab=2, las=1)
+lines(mu, prior_g, xaxs='i', yaxs='i', type='l', lty=2, lwd = 3,
+      col = 'blue', cex.main=2.5,
+      xlab="", ylab="", cex.lab=2, las=1)
+lines(mu, like_n, xaxs='i', yaxs='i', type='l', lty=3, lwd = 3,
+      col = 'red', cex.main=2.5,
+      xlab="", ylab="", cex.lab=2, las=1)
+legend('topleft', col=c("chartreuse3", "blue", "red"), 
+       lty=c(1, 2, 3), bty='n', cex=1.5, lwd=3, x.intersp=0.2,
+       legend = c("Posterior", "Prior", "Likelihood")
+       )
+```
+
+<!-- #region -->
+# Exercise 3
+
+A study on water quality of streams, a high level of bacter $X$ was defined as a level greater than $100$ per $100$ ml of stream water. $n= 116$ samples were taken from streams having a high environmental impact on pandas.
+Out of these, $y= 11$ had a high bacter $X$ level.
+
+Indicating with $p$ the probability that a sample of water taken from the stream has a high bacter $X$ level:
+
+1. find the frequentist estimator for $p$;
+1. using a $Beta(1,10)$ prior for $p$, calculate and posterior distribution $P(p∣y)$;
+1. find the bayesian estimator for $p$, the posterior mean and variance, and a $95\%$ credible interval;
+1. test the hypotesis
+    $$H_0:p= 0.1 \quad \text{ versus } \quad H_1:p \ne 0.1$$
+    at $5\%$ level of significance with both the frequentist and bayesian approach.
+
+A new measurement, performed one month later on $n= 165$ water samples, gives $y= 9$ high bacter $X$ level.
+
+5. Find the frequentist estimator for $p$.
+6. Find a bayesian estimator for $p$, assuming both a $Beta(1,10)$ prior for $p$, and assuming the posterior probability of the older measurement as the prior for the new one.
+7. Find the bayesian estimator for $p$, the posterior mean and variance, and a $95\%$ credible interval.
+8. Test the hypotesis
+    $$H_0:p= 0.1 \quad \text{ versus } \quad H_1:p \ne 0.1$$
+    at 5% level of significance with both the frequentist and bayesian approach.
+  
+  
+## Solution
+
+**1.** The most simple frequentist estimator for $p$ is:
+
+$$ p = \frac{y}{n}=\frac{11}{116} \approx 0.094828$$
+as shown in the cell below.
+<!-- #endregion -->
+
+```{r}
+n  <- 116
+y  <- 11
+(p <- y/n)
+(s <- sqrt(p*(1-p)/n))  #standard deviation 
+```
+
+**2.** For the bayesian approach, we consider a $Beta(1, 10)$ prior for $p$, and a Binomial distribution as prior. Hence, thanks to Bayes theorem and the properties of the Beta prior (which is a conjugate function for the Binomial distribution), the Posterior will be a Beta distribution with 
+
+$$\bar{\alpha}= \alpha + y = 1 + 11 = 12 \quad \text{ and } \quad \bar{\beta}= \beta + n - y = 10 + 116 - 11 = 115$$
+
+**3.** The bayesian estimator for $p$ can be assumed to be the _mean_ of the posterior distribution or the _mode_ , which are respectively equal to: $$\bar{p}= \frac{\bar{\alpha}}{\bar{\alpha}+\bar{\beta}}= \frac{12}{127} \approx 0.094488 $$
+and
+$$ Mo_p = \frac{\bar{\alpha}-1}{\bar{\alpha}+\bar{\beta}-2}= \frac{11}{125} = 0.088$$
+
+The variance instead is:
+$$Var = \frac{\bar{\alpha}\bar{\beta}}{(\bar{\alpha}+\bar{\beta})^2(\bar{\alpha}+\bar{\beta}+1)} \approx 6.684 \cdot 10^{-4}$$
+
+The boundaries of the Credibility interval are taken simmetrically using the quantile function of the Beta posterior distribution.
+
+```{r}
+a <- 12
+b <- 115
+
+nsamples <- 500
+ps <- seq(0, 1, by=1/nsamples)
+
+posterior <- dbeta(ps, a, b)
+
+mean <- a/(a+b)
+mode <- (a-1)/(a+b-2)
+var  <- a*b/((a+b)^2*(a+b+1))
+
+p1 <- qbeta(0.025, a, b)
+p2 <- qbeta(0.975, a, b)
+
+cat("-------------------\n")
+cat("Bayesian estimators", '\n')
+cat("-------------------\n")
+cat("Mean = ", mean, "\nMode = ", mode, 
+    "\nVariance = ", var, "\nStandard deviation = ", sqrt(var), 
+    "\n95%C.I. = [", p1, "; ", p2,"]", '\n')
+
+```
+
+**4.** Having computed the $95\%$ Credible Interval, one could observe that $p_{H_0}=0.1$ lies within the C.I.: hence we accept the $H_0$ hypothesis at $5\%$ level of significance for the Bayesian approach.
+
+For the frequentist approach, we set the null distribution as $Bin(y ∣ n=116, p=0.1)$. Then we set the rejection interval by using the quantile function in a symmetrical way, in order to find a value of $\alpha$ as close as possible to $5\%$. As the quantile is defined as the smallest value $x$ such that $F(x) \geq p$, where $F$ is the cumulative distribution function, we need to take into account that the boundaries found are excluded from our rejection interval, in order to avoid overestimation of $\alpha$.
+
+```{r}
+ys       <- seq(1, n)
+counts   <- dbinom(ys, n, 0.1)
+accept1 <- qbinom(0.025, n, 0.1)
+accept2 <- qbinom(0.975, n, 0.1)
+
+colors   <- rep("firebrick1", n)
+colors[ys>=accept1 & ys<=accept2] <- "lightgreen" 
+colors[y] <- "midnightblue"
+
+barplot(counts, cex.main = 2.5, cex.lab = 2, las = 1,
+        xlab = "y", ylab = "p", main = "Frequentist hypothesis testing",
+        xlim = c(0, 30), names.arg = ys,
+        col = colors, legend=TRUE)
+legend('topright', fill=c("firebrick1", "lightgreen", "midnightblue"), 
+       bty='n', cex=1.5, x.intersp=0.2,
+       legend = c(paste0("Accept in [ ", accept1, "; ", accept2, "]"),
+                  paste0("Reject  y > ", accept2, "; y < ", accept1),
+                  paste0("y = ", y))
+         )
+```
+
+Observing the graph, we can state that $p_{H_0}$ belong to the acceptance interval: hence we accept the $H_0$ hypothesis.
+
+
+**5.** The approach is analogue to point **1.**, but with the new data.
+
+```{r}
+n  <- 165
+y  <- 9
+(p <- y/n)
+(s <- sqrt(p*(1-p)/n))
+```
+
+**6.** Given the properties of the Beta prior (which is a conjugate function for the Binomial distribution), the Posterior will be even in this case a Beta distribution for both the priors considered. We will have: 
+$$\bar{\alpha_1}= \alpha + y = 1 + 9 = 10 \quad \text{ and } \quad \bar{\beta_1}= \beta + n - y = 10 + 165 - 9 = 166 $$
+for the prior $Beta(1,10)$, and:
+$$\bar{\alpha_2}= \bar{\alpha} + y = 12 + 9 = 21 \quad \text{ and } \quad \bar{\beta_2}= \bar{\beta} + n - y = 115 + 165 - 9 = 271 $$
+for the previously computed posterior ($Beta(12,115)$) taken as prior.
+
+**7.** The bayesian estimator for $p$ can be assumed again to be the _mean_  or the _mode_ of the posterior distribution, leading respectively to: $$\bar{p_1}= \frac{\bar{\alpha_1}}{\bar{\alpha_1}+\bar{\beta_1}}= \frac{10}{176} \approx 0.05681 \quad \text{ and } \quad \bar{p_2} = \frac{\bar{\alpha_2}}{\bar{\alpha_2}+\bar{\beta_2}}= \frac{21}{293} \approx 0.07192 $$.
+and
+$$ Mo_{p_1} = \frac{\bar{\alpha_1}-1}{\bar{\alpha_1}+\bar{\beta_1}-2}= \frac{9}{174} \approx 0.05172 \quad \text{ and } \quad Mo_{p_2} = \frac{\bar{\alpha_2}-1}{\bar{\alpha_2}+\bar{\beta_2}-2}= \frac{20}{291} \approx 0.06897 $$
+
+The bayesian estimator for $p$ is assumed  to be the _mean_ of the posterior distribution, leading to: 
+The variance:
+$$Var_1 = \frac{1660}{(176)^2(177)} \approx 3.0277 \cdot 10^{-4} \quad \text{ and } \quad Var_2 = \frac{5691}{(292)^2(293)} \approx 2.278 \cdot 10^{-4}$$
+
+The boundaries of the Credibility Intervals are taken simmetrically using the quantile function of the Beta posterior distribution.
+
+```{r}
+a_1 <- 10
+b_1 <- 166
+
+a_2 <- 21
+b_2 <- 271
+
+nsamples <- 500
+ps <- seq(0, 1, by=1/nsamples)
+
+posterior_1 <- dbeta(ps, a_1, b_1)
+posterior_2 <- dbeta(ps, a_2, b_2)
+
+mean <- a_1/(a_1+b_1)
+mode <- (a_1-1)/(a_1+b_1-2)
+var  <- a_1*b_1/((a_1+b_1)^2*(a_1+b_1+1))
+
+p1_1 <- qbeta(0.025, a_1, b_1)
+p2_1 <- qbeta(0.975, a_1, b_1)
+
+cat("--------------------------------------\n")
+cat("Bayesian estimators, Prior Beta(1,10)", '\n')
+cat("--------------------------------------\n")
+cat("Mean = ", mean, "\nMode = ", mode, 
+    "\nVariance = ", var, "\nStandard deviation = ", sqrt(var), 
+    "\n95%C.I. = [", p1_1, "; ", p2_1,"]", '\n')
+
+mean <- a_2/(a_2+b_2)
+mode <- (a_2-1)/(a_2+b_2-2)
+var  <- a_2*b_2/((a_2+b_2)^2*(a_2+b_2+1))
+
+p1_2 <- qbeta(0.025, a_2, b_2)
+p2_2 <- qbeta(0.975, a_2, b_2)
+
+cat("--------------------------------------\n")
+cat("Bayesian estimators, Prior Beta(12,115)", '\n')
+cat("--------------------------------------\n")
+cat("Mean = ", mean, "\nMode = ", mode, 
+    "\nVariance = ", var, "\nStandard deviation = ", sqrt(var), 
+    "\n95%C.I. = [", p1_2, "; ", p2_2,"]", '\n')
+
+```
+
+**8.** Having computed the $95\%$ Credible Interval for both posteriors, one could observe that:
+
+- for the $Beta(1,10)$ prior, $p_{H_0}=0.1$  does not lie within the C.I.: hence we reject the $H_0$ hypothesis at $5\%$ level of significance.
+
+- For the $Beta(12,115)$ prior, $p_{H_0}=0.1$ lies within the C.I.: hence we accept the $H_0$ hypothesis at $5\%$ level of significance.
+
+For the frequentist approach, we proceed exactly as point **4.**. Since $p_{H_0}$ (although barely) belongs to the acceptance interval, we accept the $H_0$ hypothesis.
+
+
+```{r}
+ys       <- seq(1, n)
+counts   <- dbinom(ys, n, 0.1)
+accept1 <- qbinom(0.025, n, 0.1)
+accept2 <- qbinom(0.975, n, 0.1)
+
+colors   <- rep("firebrick1", n)
+colors[ys>=accept1 & ys<=accept2] <- "lightgreen" 
+colors[y] <- "midnightblue"
+
+barplot(counts, cex.main = 2.5, cex.lab = 2, las = 1,
+        xlab = "y", ylab = "p", main = "Frequentist hypothesis testing",
+        xlim = c(1, 40), names.arg = ys, col = colors, legend=TRUE)
+legend('topright', fill=c("firebrick1", "lightgreen", "midnightblue"), 
+       bty='n', cex=1.5, x.intersp=0.2,
+       legend = c(paste0("Accept in [ ", accept1, "; ", accept2, "]"),
+                  paste0("Reject  y > ", accept2, "; y < ", accept1),
+                  paste0("y = ", y))
+         )
+```
+
+```{r}
+
+```

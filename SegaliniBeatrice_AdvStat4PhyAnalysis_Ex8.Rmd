@@ -1,0 +1,597 @@
+```{r}
+#install.packages("latex2exp")
+#install.packages("gplots")
+#install.packages("mvtnorm")
+library("latex2exp")
+library("gplots") # for plotCI
+library("mvtnorm") # for rmvnorm
+```
+
+# Exercise 1
+
+Students from the Bachelor degree in Physics performed an experiment to study the Zeeman effect. 
+The apparatus contains a Ne source lamp whose position can be changed. 
+During the setting up of the apparatus, the source position has to be adjusted in order to maximize the intensity of the detected light signal.
+
+The following table gives the position of the source (in mm) and the corresponding height of the peak (arbitrary units) for the wavelength under study:
+
+$$\begin{array}{c|ccccccccc}
+\hline x_{i} & 2.44 & 3.49 & 3.78 & 3.31 & 3.18 & 3.15 & 3.1 & 3.0 & 3.6 & 3.4 \\
+y_{i} & 129 & 464 & 189 & 562 & 589 & 598 & 606 & 562 & 360 & 494 \\
+\hline
+\end{array}$$
+
+Assume a quadratic dependence of the peak height, $y_i$ as a function of the source position $x_i$, 
+
+$$f(x) =c_0+c_1 x+c_2 x^2$$
+
+All the measured values are affected by a Gaussian noise with zero mean, such that
+
+$$ y_i= f(x_i)+\epsilon$$
+
+where $\epsilon$ follows a normal distribution with mean $\mu= 0$ and unknown standard deviation, $\sigma$.
+
+1.  Build a Markov Chain Monte Carlo to estimate the best parameters of the quadratic dependence of the data and the noise that affects the measured data.
+
+As can be seen from our data, the students forgot to take measurements in the region $x\in[2.44,3.0]$.
+
+2. run  a  Markov  Chain  Monte  Carlo  to  predict  peak  height  measurements  at $x_1=  2.8$ mm  and $x_2= 2.6$ mm.
+
+
+## Solution
+
+**1.** The first step is to code a Markov Chain MonteCarlo algorithm (Metropolis), whose goal is to return:
+- the log10 Prior;
+- the log10 Posterior;
+- the estimated parameters.
+
+Observe that the sum of log10 Prior and Posterior is taken to be the log of the density function (i.e. unnormalized posterior).
+
+The algorithm sample from the distribution $f$ (``func`` in the code) by performing the following steps (with $t$ the iteration index):
+
+1. Initialize the chain at some value.
+1. Draw a random sample from the distribution $Q(s ∣ \theta)$, which is a multivariate Gaussian where $\theta_t$ is the mean and the covariance is fixed to ``sampleCov``.
+1. Decide whether to accept or not the new candidate sample on the basis of the Metropolis ratio:
+$$\rho=\frac{f(s)}{f\left(\theta_{t}\right)} \frac{Q\left(\theta_{t} | s\right)}{Q\left(s | \theta_{t}\right)}$$
+
+    - if $\rho \geq 1$ the new candidate is accepted and $\theta_{t+1}=s $;
+    - if $\rho < 1$ we only accept it with probability $\rho \longrightarrow$ draw $u\sim U(0,1)$ and set $\theta_{t+1}=s $ only if $u \leq \rho$;
+    - if $s$ is not accepted, we set $\theta_{t+1}=\theta_{t}$, i.e. the existing sample in the chain is repeated.
+    
+The algorithm stops after a certain number of iterations. A total number $N_{samples} + N_{burn-in}$ are drawn, but the initial samples (the burn-in indeed) are discarded.
+
+Note that the first argument of ``func`` must be a real vector of parameters, the initial values of which are provided by the real vector ``thetaInit``.
+
+```{r}
+# Diagnostics are printed every verbose^th sample: sample number, acceptance rate so far.
+
+# ... is used to pass data, prior parameters etc. to func().
+
+# Return a Nsamp * (2+Ntheta) matrix (no names), where the columns are
+# 1:  log10 prior PDF
+# 2:  log10 likelihood
+# 3+: Ntheta parameters
+
+# The order of the parameters in thetaInit and sampleCov must match
+
+metrop <- function(func, thetaInit, Nburnin, Nsamp, sampleCov, verbose, ...) {
+
+  Ntheta   <- length(thetaInit)
+  thetaCur <- thetaInit
+  funcCur  <- func(thetaInit, ...) # log10
+  funcSamp <- matrix(data=NA, nrow=Nsamp, ncol=2+Ntheta) 
+  # funcSamp will be filled and returned
+  nAccept  <- 0
+  acceptRate <- 0
+  
+  for(n in 1:(Nburnin+Nsamp)) {
+
+    # Metropolis algorithm. No Hastings factor for symmetric proposal
+    if(is.null(dim(sampleCov))) { # theta and sampleCov are scalars
+      thetaProp <- rnorm(n=1, mean=thetaCur, sd=sqrt(sampleCov))
+    } else {
+      thetaProp <- rmvnorm(n=1, mean=thetaCur, sigma=sampleCov, 
+                           method="eigen")
+    }
+    funcProp  <- func(thetaProp, ...) 
+    logMR <- sum(funcProp) - sum(funcCur) # log10 of the Metropolis ratio
+    #cat(n, thetaCur, funcCur, ":", thetaProp, funcProp, "\n")
+    if(logMR>=0 || logMR>log10(runif(1, min=0, max=1))) {
+      thetaCur   <- thetaProp
+      funcCur    <- funcProp
+      nAccept    <- nAccept + 1
+      acceptRate <- nAccept/n
+    }
+    if(n>Nburnin) {
+      funcSamp[n-Nburnin,1:2] <- funcCur
+      funcSamp[n-Nburnin,3:(2+Ntheta)] <- thetaCur
+    }
+
+    # Diagnostics
+    if( is.finite(verbose) && (n%%verbose==0 || n==Nburnin+Nsamp) ) {
+      s1 <- noquote(formatC(n,          format="d", digits=5, flag=""))
+      s2 <- noquote(formatC(Nburnin,    format="g", digits=5, flag=""))
+      s3 <- noquote(formatC(Nsamp,      format="g", digits=5, flag=""))
+      s4 <- noquote(formatC(acceptRate, format="f", digits=4, width=7, 
+                            flag=""))
+      cat(s1, "of", s2, "+", s3, s4, "\n")
+    }
+
+  }
+
+    return(funcSamp)
+ 
+}
+```
+
+Now we define the quadratic model required for this exercise's analysis.
+We code functions to provide evaluations of prior, likelihood and posterior for the quadratic model, plus sampling from the prior.
+
+In the code, $\sigma$ is computed by taking the $\log_{10}$.
+
+The Prior PDFs considered are:
+
+- for $c_0$: $Norm(\mu=m, \sigma=s)$, with $m$, $s$ estimated from global properties of data;
+- for $c_1$: $Norm(\mu=m, \sigma=s)$, with $m$, $s$ estimated from global properties of data;
+- for $c_2$: $Norm(\mu=m, \sigma=s)$, with $m$, $s$ estimated from global properties of data;
+- for $\log_{10}(\sigma)$: improper uniform prior.
+
+
+```{r}
+# theta = vector of parameters
+# obsdata = 2 column dataframe with names [x,y] of observed data.
+
+# Return c(log10(prior), log10(likelihood)) (each generally unnormalized) of the quadratic model
+logpost.quadraticmodel <- function(theta, obsdata) {
+  logprior <- logprior.quadraticmodel(theta)
+  if(is.finite(logprior)) { # only evaluate model if parameters are sensible
+    return( c(logprior, loglike.quadraticmodel(theta, obsdata)) )
+  } else {
+    return( c(-Inf, -Inf) )
+  }
+}
+
+# Return log10(likelihood) for parameters theta and obsdata
+# dnorm(..., log=TRUE) returns log base e, so multiply by 1/ln(10) to get log base 10
+
+loglike.quadraticmodel <- function(theta, obsdata) {
+  # convert to log10(ysig) to ysig
+  theta[4] <- 10^theta[4]
+  modPred <- drop( theta[1:3] %*% t(cbind(1,obsdata$x,obsdata$x^2)) )
+  # Dimensions in above mixed vector/matrix multiplication: [Ndat] = [P] %*% [P x Ndat] 
+  logLike <- (1/log(10))*sum( dnorm(modPred - obsdata$y, mean=0, sd=theta[4], log=TRUE) )
+  return(logLike)
+}
+
+# Return log10(unnormalized prior)
+logprior.quadraticmodel <- function(theta) {
+  c0Prior      <- dnorm(theta[1], mean=c_i[1], sd=50)
+  c1Prior      <- dnorm(theta[2], mean=c_i[2], sd=50)
+  c2Prior      <- dnorm(theta[3], mean=c_i[3], sd=50)
+  logysigPrior <- 1 
+  logPrior <- sum( log10(c0Prior), log10(c1Prior), log10(c2Prior), log10(logysigPrior) )
+  return(logPrior)
+}
+```
+
+Here we plot the experimental data. 
+
+```{r}
+# data
+x <- c(2.44, 3.49, 3.78, 3.31, 3.18, 3.15, 3.1, 3.0, 3.6, 3.4)
+y <- c(129, 464, 189, 562, 589, 598, 606, 562, 360, 494)
+# dataframe containing data
+obsdata <- data.frame(cbind(x,y)) # columns must be named "x" and "y"
+
+options(repr.plot.width=8, repr.plot.height=6)  #to set graph size
+par(mfrow=c(1,1), mar=c(5, 5, 4, 2))
+
+plot(x, y, xaxs='i', yaxs='i',
+     type='p', lwd = 3, pch=4,
+     xlim=c(2.37, 3.85), ylim=c(115,620), 
+     col = 'midnightblue', cex.main=2.5,
+     main= "Experimental data",
+     xlab= TeX(sprintf("x \\[mm\\]")), ylab=TeX(sprintf("y \\[au\\]")),  
+     cex.lab=2, las=1)
+
+```
+
+Finally, we apply the quadratic model to our experimental data in order to estimate the parameters required.
+
+The model to infer is a linear regression with Gaussian noise, whose parameters (contained in ``theta``) are:
+- intercept $c_0$, 
+- gradient $c_1$, 
+- quadratic term $c_2$
+- Gaussian noise $\sigma$ (``ysig`` in the code).
+
+In the code, the covariance matrix of MCMC sampling PDF is fixed to ``sampleCov``, with parameters estimated from global properties of data.
+
+Parameters are initialized taking the estimates of a least squares fit.
+
+```{r}
+# Initialization of parameters with a least squares fit
+lsfit <- lm(y ~ x + I(x^2), data=obsdata)
+
+(c_i <- lsfit$coefficients)
+(s_i <- log10(sqrt(mean(lsfit$residuals^2))))
+
+```
+
+In the following cells, we perform the MCMC algorithm and plot the results.
+
+```{r}
+##### Bayesian inference of a 4-parameter quadratic model to 2D data
+
+# Initial parameters
+thetaInit <- c(c_i[1], c_i[2], c_i[3], s_i)
+
+# Covariance matrix of MCMC sampling PDF
+sampleCov <- diag(c(25, 25, 25, 0.05)^2)
+
+# Run the MCMC to find postSamp, samples of the posterior PDF
+set.seed(1234430)
+allSamp <- metrop(func=logpost.quadraticmodel, thetaInit=thetaInit, Nburnin=2e4, Nsamp=5e5,
+                   sampleCov=sampleCov, verbose=1e5, obsdata=obsdata)
+# 10^(allSamp[,1]+allSamp[,2]) is the unnormalized posterior at each sample
+thinSel  <- seq(from=1, to=nrow(allSamp), by=100) # thin by factor 100
+postSamp <- allSamp[thinSel,]
+```
+
+```{r}
+# Plot MCMC chains
+
+options(repr.plot.width=16, repr.plot.height=20)  #to set graph size
+par(mfrow=c(4,2), mar=c(5, 5, 4, 2))
+
+parnames <- c(expression(c[0]), expression(c[1]), expression(c[2]), 
+              expression(paste(log, " ", sigma)))
+for(j in 3:6) { # columns of postSamp
+  plot(1:nrow(postSamp), postSamp[,j], type="l", 
+       xlab="iteration", ylab=parnames[j-2], 
+       col='darkmagenta', cex.lab=2, las=1)
+  postDen <- density(postSamp[,j], n=2^10)
+  plot(postDen$x, postDen$y, type="l", lwd=2.5, yaxs="i", ylim=1.05*c(0,max(postDen$y)),
+       xlab=parnames[j-2], ylab="density",
+       col='mediumpurple4', las=1, cex.lab=2)
+}
+
+```
+
+We also represent the correlation between the parameters.
+
+```{r}
+# Plot all parameter samples in 2D
+
+options(repr.plot.width=16, repr.plot.height=16)  #to set graph size
+par(mfcol=c(3,3), mar=c(3.5,3.5,0.5,0.5), oma=c(0.1,0.1,0.1,0.5), mgp=c(2.0,0.8,0))
+
+for(i in 1:3) {
+  for(j in 2:4) {
+    if(j<=i) {
+        plot.new()
+      } else {
+        plot(postSamp[,i+2], postSamp[,j+2], 
+             xlab=parnames[i], ylab=parnames[j], 
+             pch=4, cex.lab=2, lwd=3)
+    }
+  }
+}
+
+```
+
+One can notice that $c_1$ is evidently correlated to both $c_2$ and $c_0$.
+
+Now we can find the best estimate by taking the peak of the posterior distribution for each parameter computed.
+
+```{r}
+# Find peak of posterior and mean solutions
+
+posMAP    <- which.max(postSamp[,1]+postSamp[,2]) 
+thetaMAP  <- postSamp[posMAP, 3:6]
+thetaMean <- apply(postSamp[,3:6], 2, mean) # Monte Carlo integration
+
+# Overplot MAP solution with original data
+
+options(repr.plot.width=8, repr.plot.height=6)  #to set graph size
+par(mar=c(5, 5, 4, 2))
+
+xs <- seq(2,4,length.out=500)
+ys <- thetaMAP[1]+thetaMAP[2]*xs+thetaMAP[3]*xs^2
+
+plotCI(obsdata$x, obsdata$y, xaxs="i", yaxs="i", 
+       xlim=c(2.37, 3.85), ylim=c(110,620), 
+       xlab= TeX(sprintf("x \\[mm\\]")), ylab=TeX(sprintf("y \\[au\\]")),  
+       main= "Experimental data and quadratic fit",
+       cex.main=2.5, cex.lab=2, las=1, pch=4, lwd=2,
+       col='midnightblue', barcol="midnightblue",
+       uiw=10^thetaMAP[4], gap=0, )
+
+lines(xs, ys, col='darkorange', lwd=3, lty=2)
+
+legend('bottom', col=c("midnightblue","darkorange"), 
+       lty=c(1, 2), pch=c(4,NA), bty='n', 
+       cex=1.5, lwd=3, x.intersp=0.2,
+       legend = c("Data with errobars", TeX(sprintf("c_0 + c_1 x + c_2 x^2"))),
+       )
+
+cat("-------------------\n")
+cat("Parameters", '\n')
+cat("-------------------\n")
+cat("c_0   = ", thetaMAP[1], 
+    "\nc_1   = ", thetaMAP[2], 
+    "\nc_2   = ", thetaMAP[3],
+    "\nsigma = ", 10^thetaMAP[4])
+
+
+```
+
+**2.** To predict peak height measurements at $𝑥_1=2.8$ mm and $𝑥_2=2.6$ mm, we run a MCMC with both a _direct_ approach and the _indirect_ approach, just as seen in the lecture.
+
+```{r}
+options(repr.plot.width=14, repr.plot.height=6)  #to set graph size
+par(mar=c(5, 5, 4, 2), mfrow=c(1,2))
+
+xnew <- c(2.6, 2.8)
+ypred <- NULL
+yPredDirect <- NULL
+ui <- NULL
+li <- NULL
+
+for(i in 1:2) {
+    # Evaluate generative model at posterior samples (from MCMC).
+    # Dimensions in matrix multiplication: [Nsamp x 1] = [Nsamp x P] %*% [P x 1]
+    modPred <- cbind(postSamp[,3], postSamp[,4], postSamp[,5]) %*% t(cbind(1, xnew[i], xnew[i]^2))
+    
+    # ---- Indirect method ----
+    likeSamp <- rnorm(n=length(modPred), mean=modPred, sd=10^postSamp[,6])
+    likeDen  <- density(likeSamp, n=2^10)
+
+    # Find peak and confidence intervals
+    yPredIndirect <- c(likeDen$x[which.max(likeDen$y)], 
+                       quantile(likeSamp, probs=c(pnorm(-1), pnorm(+1)), names=FALSE))
+    ypred <- c(ypred, likeDen$x[which.max(likeDen$y)] )
+    
+    plot(likeDen$x, likeDen$y, col='green', type="l", lwd=2, las=1,
+         main=paste0("Indirect method, xnew=", xnew[i]), cex.main= 2, cex.lab=1.5,
+         xlab=expression(y[p]),ylab=expression(paste("P(", y[p], " | ", x[p], ", D)")))
+    abline(v=yPredIndirect, col='forestgreen', lty=2, lwd=1.5)
+    
+    # ---- Direct method ----
+    # ycand must span full range of likelihood and posterior
+    dy     <- 1
+    ymid   <- thetaMAP[1] + xnew[i]*thetaMAP[2] + thetaMAP[3]*xnew[i]^2 
+    # to center choice of ycand
+    ycand <- seq(ymid-100, ymid+100, dy) 
+    # uniform grid of y with step size dy
+    ycandPDF <- vector(mode="numeric", length=length(ycand))
+    for(k in 1:length(ycand)) {
+        like <- dnorm(ycand[k], mean=modPred, sd=10^postSamp[,6]) # [Nsamp x 1]
+        ycandPDF[k] <- mean(like) # integration by rectangle rule. Gives a scalar
+    }
+    # Note that ycandPDF[k] is normalized , i.e. sum(dy*ycandPDF)=1.
+    # Find peak and approximate confidence intervals at 1sigma on either side
+    peak.ind   <- which.max(ycandPDF)
+    lower.ind <- max( which(cumsum(dy*ycandPDF) < pnorm(-1)) )
+    upper.ind <- min( which(cumsum(dy*ycandPDF) > pnorm(+1)) )
+    yPred  <- ycand[c(peak.ind, lower.ind, upper.ind)]
+    yPredDirect <- c(yPredDirect, ycand[peak.ind])
+    ui <- c(ui, ycand[upper.ind])
+    li <- c(li, ycand[lower.ind])
+    
+    plot(ycand, ycandPDF , type="l", col='orchid', lwd=2, las=1,
+         main=paste0("Direct method, xnew=", xnew[i]), cex.main= 2, cex.lab=1.5,
+         ylim=1.05*c(0,max(ycandPDF)), xlab=expression(y[p]),
+         ylab=expression(paste("P(", y[p], " | ", x[p], ", D)")))
+    abline(v=yPred , col='violetred4', lty=2, lwd=1.5)
+}
+```
+
+```{r}
+options(repr.plot.width=14, repr.plot.height=6)  #to set graph size
+par(mar=c(5, 5, 4, 2), mfrow=c(1,2))
+
+# Overplot direct prediction with original data and the MAP model
+plot(xs, ys, col='darkorange', type="l", lty=2,
+     xlim=c(2.37, 3.85), ylim=c(110,620), 
+     xlab= TeX(sprintf("x \\[mm\\]")), ylab=TeX(sprintf("y \\[au\\]")),  
+     main= "Indirect method predictions",
+     cex.main=2.5, cex.lab=2, las=1, lwd=3
+    )
+
+plotCI(obsdata$x, obsdata$y, xaxs ="i", yaxs="i", 
+       lwd=2, pch=4, add=TRUE,
+       col='midnightblue', barcol="midnightblue",
+       uiw=10^thetaMAP[4], gap=0)
+
+plotCI(xnew, ypred, uiw=10^thetaMAP[4],
+       gap=0, add=TRUE, lwd=3, col='firebrick3')
+
+legend(2.6, 2.5, col=c("midnightblue", "darkorange", "firebrick3"), 
+       lty=c(1, 2, 1), pch=c(4, NA, 1), bty='n', 
+       cex=1.5, lwd=3, x.intersp=0.2,
+       legend = c("Data with errobars", 
+                  TeX(sprintf("c_0 + c_1 x + c_2 x^2")),
+                  "Predicted data"),
+       )
+
+plot(xs, ys, col='darkorange', type="l", lty=2,
+     xlim=c(2.37, 3.85), ylim=c(110,620), 
+     xlab= TeX(sprintf("x \\[mm\\]")), ylab=TeX(sprintf("y \\[au\\]")),  
+     main= "Direct method predictions",
+     cex.main=2.5, cex.lab=2, las=1, lwd=3
+    )
+
+plotCI(obsdata$x, obsdata$y, xaxs ="i", yaxs="i", 
+       lwd=2, pch=4, add=TRUE,
+       col='midnightblue', barcol="midnightblue",
+       uiw=10^thetaMAP[4], gap=0)
+
+plotCI(xnew, yPredDirect, li=li, ui=ui,
+       gap=0, add=TRUE, lwd=3, col='firebrick3')
+
+legend(2.6, 2.5, col=c("midnightblue", "darkorange", "firebrick3"), 
+       lty=c(1, 2, 1), pch=c(4, NA, 1), bty='n', 
+       cex=1.5, lwd=3, x.intersp=0.2,
+       legend = c("Data with errobars", 
+                  TeX(sprintf("c_0 + c_1 x + c_2 x^2")),
+                  "Predicted data"),
+       )
+
+```
+
+<!-- #region -->
+# Exercise 2
+
+The number of British coal mine disasters has been recorded from 1851 to 1962.  By looking at the data it seems that the number of incidents decreased towards the end of the sampling period.  We model the data as follows:
+
+-  before some year, we call $\tau$, the data follow a Poisson distribution, where the logarithm of the mean value, $\log \mu_t=b_0$, while for later years, we can model it as $\log \mu_t=b_0+b_1$.
+
+The dependence can be modeled as $y_t \sim Pois(\mu_t)$, where $\log \mu_t = b_0+b_1Step(t−\tau)$.
+
+1. Implement the model in `jags`, trying to infer the parameters $b_0$, $b_1$ and $\tau$. The step function is implemented, in `BUGS`, as `step(x)` and return $1$ if $x\geq 0$ and $0$ otherwise. Assign a uniform prior to $b_0$, $b_1$ and a uniform prior in the interval $(1,N)$ to $\tau$, where $N= 112$ is the number of years our data span on.
+
+
+2. Finally, here is our data:
+
+```
+data <− NULL
+
+data$D <−c( 4, 5, 4, 1, 0, 4, 3, 4, 0, 6, 3, 3, 4, 0, 2, 6, 3, 3, 5, 4, 5, 3, 1, 4, 4, 1, 5, 5, 3, 4, 2, 5, 2, 2, 3, 4, 2, 1, 3, 2, 1, 1, 1, 1, 1, 3, 0, 0, 1, 0, 1, 1, 0, 0, 3, 1, 0, 3, 2, 2, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 2, 1, 0, 0, 0, 1, 1, 0, 2, 2, 3, 1, 1, 2, 1, 1, 1, 1, 2, 4, 2, 0, 0, 0, 1, 4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0 )
+
+data$N<−112
+```
+
+3. Before running `jags`, assign an initial value to the parameters as follows: $b_0= 0$, $b_1= 0$ and $\tau= 50$.
+
+4. Explore the features of the chains and try to understand the effects of the burn-in, and thinning.
+
+5. Plot the posterior distributions of the parameters and extract their mean values, and $95\%$ credibility intervals.
+
+## Solution
+
+At first, we proceed in defining the model in ``BUGS``.
+<!-- #endregion -->
+
+```{r}
+library('rjags')
+library('coda')
+
+filename <- "model_ex8.bug"
+cat("model {
+
+    # Likelihood
+    for (t in 1:N) {
+        mu[t] <- exp(b0 + b1*step(t-tau))
+        D[t] ~ dpois(mu[t]) 
+        }
+        
+    # a uniform prior for b0, b1
+    b0 ~ dunif(-3, 3);
+    b1 ~ dunif(-3, 3);
+    
+    # a uniform prior for tau in (1,N)
+    tau ~ dunif(1, N);
+        
+    }
+    ", file=filename
+)
+```
+
+In the cell below, we import the data and initialize the parameters as requested.
+
+```{r}
+#Collected data
+data <− NULL
+
+data$D <−c( 4, 5, 4, 1, 0, 4, 3, 4, 0, 6, 3, 3, 4, 0, 
+            2, 6, 3, 3, 5, 4, 5, 3, 1, 4, 4, 1, 5, 5,
+            3, 4, 2, 5, 2, 2, 3, 4, 2, 1, 3, 2, 1, 1, 
+            1, 1, 1, 3, 0, 0, 1, 0, 1, 1, 0, 0, 3, 1, 
+            0, 3, 2, 2, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 
+            0, 2, 1, 0, 0, 0, 1, 1, 0, 2, 2, 3, 1, 1, 
+            2, 1, 1, 1, 1, 2, 4, 2, 0, 0, 0, 1, 4, 0, 
+            0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0 )
+
+data$N<−112
+
+# Initial values
+start_params <- NULL
+start_params$b0 <- 0
+start_params$b1 <- 0
+start_params$tau <- 50
+```
+
+To xplore the features of the chains and try to understand the effects of the burn-in and thinning, we define the model multiple times and plot the chain result and autocorrelation. 
+
+```{r}
+n_burnin <- c(10, 400, 1000)
+thinning <- c(1, 10, 25)
+
+n_samples <- 10000
+
+options(repr.plot.width=16, repr.plot.height=6)  #to set graph size
+par(mfrow=c(3, 2), mar=c(5, 5, 4, 2))
+        
+for (i in 1:length(n_burnin)) {
+    for (j in 1:length(thinning)){
+        jm <- jags.model(filename, data, start_params, n.adapt=100)
+        #n.adapt is the number of iterations for model adaptation. Default is 1000
+        
+        update(jm, n_burnin[i])
+        chain <- coda.samples(jm, c("b0", "b1", "tau"), n.iter = n_samples, thin=thinning[j])
+        
+        plot(chain, col='seagreen1', lwd=2)
+       
+        autocorr.plot(chain, col='pink4', cex.main=2, cex.lab=1.5, lwd=2.5)
+        
+        print(summary(chain))
+        
+    }
+}
+
+```
+
+We can observe that thinnig mainly acts by reducing the autocorrelation, while the burn-in is cause of changes in the posterior distribution as the chain starts later.
+
+We reset the model for further analysis, by taking ``n_burnin=1000`` and ``thinning=10``.
+
+We extract from ``jags`` report the value of means and $95\%$ C.I. and represent it below.
+
+```{r}
+jm <- jags.model(filename, data, start_params, n.adapt=100)
+#n.adapt is the number of iterations for model adaptation. Default is 1000
+
+n_burnin <- 1000
+n_samples <- 10000
+
+update(jm, n_burnin)
+chain <- coda.samples(jm, c("b0", "b1", "tau"), n.iter = n_samples, thin = 10 )
+
+res <- summary(chain)
+res$statistics
+res$quantiles
+```
+
+```{r}
+index <- length(res$statistics[,1])
+titles <- c(expression(b[0]), expression(b[1]), expression(tau))
+
+for (i in 1:index){
+    plot(chain[,i], lwd=2.5, cex.main=2.5, cex.lab=1.5,
+         col='springgreen4', 
+         main=titles[i], xlab=titles[i], ylab="Probability",
+         trace=FALSE, density=TRUE)
+    abline(v=res$statistics[i, 1], col='slateblue4', lwd=2, lty=2)
+    abline(v=c(res$quantiles[i, 1], res$quantiles[i, 5]), col='skyblue', lwd=2, lty=2)
+    
+    legend('topleft', col=c("springgreen4", "skyblue", "slateblue4", "skyblue"), 
+       lty=c(1, 2, 2, 2), bty='n', cex=1.5, lwd=3, x.intersp=0.2,
+       legend = c("Posterior", 
+                  TeX(sprintf("$CI_{low} = %g$", round(res$quantiles[i, 1], 4))),
+                  TeX(sprintf("Mean = %g$", round(res$statistics[i, 1], 4))),
+                  TeX(sprintf("$CI_{up} = %g$", round(res$quantiles[i, 5], 4))) )
+       )
+    
+    
+}
+```
